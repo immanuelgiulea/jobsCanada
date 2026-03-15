@@ -1,97 +1,93 @@
-# AI Exposure of the US Job Market
+# AI Exposure of the Canadian Job Market
 
-Analyzing how susceptible every occupation in the US economy is to AI and automation, using data from the Bureau of Labor Statistics [Occupational Outlook Handbook](https://www.bls.gov/ooh/) (OOH).
-
-**Live demo: [karpathy.ai/jobs](https://karpathy.ai/jobs/)**
-
-![AI Exposure Treemap](jobs.png)
+Analyzing how exposed Canadian occupation groups are to AI using official Statistics Canada and ESDC sources instead of the U.S. Bureau of Labor Statistics.
 
 ## What's here
 
-The BLS OOH covers **342 occupations** spanning every sector of the US economy, with detailed data on job duties, work environment, education requirements, pay, and employment projections. We scraped all of it, scored each occupation's AI exposure using an LLM, and built an interactive treemap visualization.
+This fork now combines three Canadian data sources:
+
+- [14-10-0416-01](https://www150.statcan.gc.ca/t1/tbl1/en/tv.action?pid=1410041601) Labour force characteristics by occupation, annual
+- [14-10-0417-01](https://www150.statcan.gc.ca/t1/tbl1/en/tv.action?pid=1410041701) Employee wages by occupation, annual
+- [2025-2027 Employment Outlooks - NOC 2021](https://open.canada.ca/data/en/dataset/b0e112e9-cf53-4e79-8838-23cd98debe5b/resource/cb52e1d0-ab62-4357-91cc-d8f5a2114e02)
+
+AI exposure is no longer driven by an LLM score in the site build. The dashboard now uses official StatCan EPIAC data from:
+
+- [Experimental Estimates of Potential Artificial Intelligence Occupational Exposure in Canada, 2024](https://www150.statcan.gc.ca/n1/pub/11f0019m/11f0019m2024005-eng.htm)
+
+That study reports AIOE, complementarity, and HELC/HEHC/low-exposure splits for published occupation groups based on the **2021 Census**. This repo maps those published EPIAC groups onto the **43 current NOC 2021 occupation groups** used in the StatCan annual tables.
+
+Context studies using the same framework:
+
+- [StatCan, January 28, 2026: employment growth since the start of the generative AI era](https://www150.statcan.gc.ca/n1/en/pub/36-28-0001/2026001/article/00001-eng.pdf)
+- [ISQ, February 3, 2026: Exposition des professions a l'intelligence artificielle en 2024](https://statistique.quebec.ca/fr/fichier/exposition-professions-intelligence-artificielle-2024.pdf)
 
 ## Data pipeline
 
-1. **Scrape** (`scrape.py`) — Playwright (non-headless, BLS blocks bots) downloads raw HTML for all 342 occupation pages into `html/`.
-2. **Parse** (`parse_detail.py`, `process.py`) — BeautifulSoup converts raw HTML into clean Markdown files in `pages/`.
-3. **Tabulate** (`make_csv.py`) — Extracts structured fields (pay, education, job count, growth outlook, SOC code) into `occupations.csv`.
-4. **Score** (`score.py`) — Sends each occupation's Markdown description to an LLM (Gemini Flash via OpenRouter) with a scoring rubric. Each occupation gets an AI Exposure score from 0-10 with a rationale. Results saved to `scores.json`.
-5. **Build site data** (`build_site_data.py`) — Merges CSV stats and AI exposure scores into a compact `site/data.json` for the frontend.
-6. **Website** (`site/index.html`) — Interactive treemap visualization where area = employment and color = AI exposure (green to red).
+1. `fetch_statcan.py`
+   Downloads the StatCan occupation tables, merges the latest employment and wage series, adds province-aggregated ESDC outlooks, and maps official StatCan EPIAC exposure fields onto the 43 dashboard occupation groups.
+2. `build_site_data.py`
+   Builds `site/data.json` for the frontend from `occupations.csv`.
+3. `make_prompt.py`
+   Builds `prompt.md`, a single markdown summary of the Canadian dataset with official EPIAC fields.
+4. `site/index.html`
+   Interactive visualization where area = Canadian employment and color = EPIAC high-exposure share.
 
 ## Key files
 
 | File | Description |
 |------|-------------|
-| `occupations.json` | Master list of 342 occupations with title, URL, category, slug |
-| `occupations.csv` | Summary stats: pay, education, job count, growth projections |
-| `scores.json` | AI exposure scores (0-10) with rationales for all 342 occupations |
-| `prompt.md` | All data in a single file, designed to be pasted into an LLM for analysis |
-| `html/` | Raw HTML pages from BLS (source of truth, ~40MB) |
-| `pages/` | Clean Markdown versions of each occupation page |
-| `site/` | Static website (treemap visualization) |
+| `occupations.json` | Canadian occupation-group index with NOC codes and EPIAC mapping summary |
+| `occupations.csv` | Employment, wages, outlooks, and official EPIAC fields |
+| `prompt.md` | Single-file markdown summary of the Canadian dataset |
+| `pages/` | Generated occupation summaries and source notes |
+| `site/` | Static website |
+| `epiac_data.py` | Official EPIAC source rows and mapping logic |
+| `outlook_data.py` | ESDC outlook ingestion and aggregation logic |
+| `score.py` | Optional legacy LLM scoring script, not used by the site build |
 
-## AI exposure scoring
+## Important differences from upstream
 
-Each occupation is scored on a single **AI Exposure** axis from 0 to 10, measuring how much AI will reshape that occupation. The score considers both direct automation (AI doing the work) and indirect effects (AI making workers so productive that fewer are needed).
-
-A key signal is whether the job's work product is fundamentally digital — if the job can be done entirely from a home office on a computer, AI exposure is inherently high. Conversely, jobs requiring physical presence, manual skill, or real-time human interaction have a natural barrier.
-
-**Calibration examples from the dataset:**
-
-| Score | Meaning | Examples |
-|-------|---------|---------|
-| 0-1 | Minimal | Roofers, janitors, construction laborers |
-| 2-3 | Low | Electricians, plumbers, nurses aides, firefighters |
-| 4-5 | Moderate | Registered nurses, retail workers, physicians |
-| 6-7 | High | Teachers, managers, accountants, engineers |
-| 8-9 | Very high | Software developers, paralegals, data analysts, editors |
-| 10 | Maximum | Medical transcriptionists |
-
-Average exposure across all 342 occupations: **5.3/10**.
-
-## Visualization
-
-The main visualization is an interactive **treemap** where:
-- **Area** of each rectangle is proportional to employment (number of jobs)
-- **Color** indicates AI exposure on a green (safe) to red (exposed) scale
-- **Layout** groups occupations by BLS category
-- **Hover** shows detailed tooltip with pay, jobs, outlook, education, exposure score, and LLM rationale
-
-## LLM prompt
-
-[`prompt.md`](prompt.md) packages all the data — aggregate statistics, tier breakdowns, exposure by pay/education, BLS growth projections, and all 342 occupations with their scores and rationales — into a single file (~45K tokens) designed to be pasted into an LLM. This lets you have a data-grounded conversation about AI's impact on the job market without needing to run any code. Regenerate it with `uv run python make_prompt.py`.
+- Source data is **Canadian** and based on **StatCan / ESDC**, not BLS handbook pages.
+- Exposure is based on **official StatCan EPIAC / AIOE / complementarity** data, not only an LLM judgment.
+- The dashboard mixes different reference periods intentionally:
+  - exposure: mapped from the StatCan 2024 EPIAC study using **2021 Census** occupation data
+  - employment and wages: latest StatCan annual tables through **2025**
+  - outlook: province-aggregated ESDC outlook data for **2025-2027**
+- The site works with **43 Canadian NOC occupation groups** rather than 342 detailed U.S. occupations.
 
 ## Setup
 
-```
+```bash
 uv sync
-uv run playwright install chromium
 ```
 
-Requires an OpenRouter API key in `.env`:
-```
-OPENROUTER_API_KEY=your_key_here
-```
+No API key is required for the current site build.
 
 ## Usage
 
 ```bash
-# Scrape BLS pages (only needed once, results are cached in html/)
-uv run python scrape.py
-
-# Generate Markdown from HTML
-uv run python process.py
-
-# Generate CSV summary
-uv run python make_csv.py
-
-# Score AI exposure (uses OpenRouter API)
-uv run python score.py
+# Download and build the Canadian occupation dataset
+uv run python fetch_statcan.py
 
 # Build website data
 uv run python build_site_data.py
 
+# Generate prompt.md
+uv run python make_prompt.py
+
 # Serve the site locally
 cd site && python -m http.server 8000
 ```
+
+Optional legacy script:
+
+```bash
+# Experimental OpenRouter-based scoring path kept for comparison only
+uv run python score.py
+```
+
+## Notes
+
+- The StatCan downloads are cached in `tmp/statcan/`.
+- `pages/` is generated output and can be recreated from `fetch_statcan.py`.
+- The EPIAC mapping is an inference from the closest published StatCan occupation groups to the current NOC 2021 dashboard groups. Each generated row and page includes a mapping note.

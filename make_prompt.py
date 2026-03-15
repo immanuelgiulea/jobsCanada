@@ -1,234 +1,172 @@
 """
-Generate prompt.md — a single file containing all project data, designed to be
-copy-pasted into an LLM for analysis and conversation about AI exposure of the
-US job market.
+Generate prompt.md with Canadian occupation data, outlooks, and official EPIAC exposure fields.
 
 Usage:
     uv run python make_prompt.py
 """
 
 import csv
-import json
 
 
-def fmt_pay(pay):
-    if pay is None:
+def fmt_money(value):
+    if value is None:
         return "?"
-    return f"${pay:,}"
+    return f"${value:,.2f}"
 
 
-def fmt_jobs(jobs):
-    if jobs is None:
+def fmt_jobs(value):
+    if value is None:
         return "?"
-    if jobs >= 1_000_000:
-        return f"{jobs / 1e6:.1f}M"
-    if jobs >= 1_000:
-        return f"{jobs / 1e3:.0f}K"
-    return str(jobs)
+    if value >= 1_000_000:
+        return f"{value / 1_000_000:.1f}M"
+    if value >= 1_000:
+        return f"{value / 1_000:.0f}K"
+    return str(value)
+
+
+def load_records():
+    with open("occupations.csv", encoding="utf-8", newline="") as handle:
+        rows = list(csv.DictReader(handle))
+
+    records = []
+    for row in rows:
+        records.append(
+            {
+                "title": row["title"],
+                "slug": row["slug"],
+                "noc_code": row.get("noc_code", ""),
+                "category": row["category"],
+                "jobs_year": int(row["data_year"]) if row.get("data_year") else None,
+                "trend_from_year": int(row["trend_from_year"]) if row.get("trend_from_year") else None,
+                "jobs": int(row["num_jobs"]) if row.get("num_jobs") else None,
+                "unemployment_rate": float(row["unemployment_rate"]) if row.get("unemployment_rate") else None,
+                "trend_pct": float(row["employment_change_pct"]) if row.get("employment_change_pct") else None,
+                "pay_hourly": float(row["median_hourly_wage"]) if row.get("median_hourly_wage") else None,
+                "outlook_label": row.get("outlook_label") or None,
+                "outlook_window_start": int(row["outlook_window_start"]) if row.get("outlook_window_start") else None,
+                "outlook_window_end": int(row["outlook_window_end"]) if row.get("outlook_window_end") else None,
+                "epiac_reference_year": int(row["epiac_reference_year"]) if row.get("epiac_reference_year") else None,
+                "epiac_display_score": int(row["epiac_display_score"]) if row.get("epiac_display_score") else None,
+                "epiac_high_exposure_pct": float(row["epiac_high_exposure_pct"]) if row.get("epiac_high_exposure_pct") else None,
+                "epiac_helc_pct": float(row["epiac_helc_pct"]) if row.get("epiac_helc_pct") else None,
+                "epiac_hehc_pct": float(row["epiac_hehc_pct"]) if row.get("epiac_hehc_pct") else None,
+                "epiac_low_pct": float(row["epiac_low_pct"]) if row.get("epiac_low_pct") else None,
+                "epiac_aioe": float(row["epiac_aioe"]) if row.get("epiac_aioe") else None,
+                "epiac_complementarity": float(row["epiac_complementarity"]) if row.get("epiac_complementarity") else None,
+                "epiac_group_label": row.get("epiac_group_label") or None,
+                "epiac_source_note": row.get("epiac_source_note") or "",
+            }
+        )
+    return records
 
 
 def main():
-    # Load all data sources
-    with open("occupations.json") as f:
-        occupations = json.load(f)
+    records = load_records()
+    records.sort(key=lambda item: (-(item["epiac_high_exposure_pct"] or 0), -(item["jobs"] or 0)))
 
-    with open("occupations.csv") as f:
-        csv_rows = {row["slug"]: row for row in csv.DictReader(f)}
+    jobs_year = max(record["jobs_year"] for record in records if record["jobs_year"] is not None)
+    trend_from_year = min(record["trend_from_year"] for record in records if record["trend_from_year"] is not None)
+    outlook_start = max(record["outlook_window_start"] for record in records if record["outlook_window_start"] is not None)
+    outlook_end = max(record["outlook_window_end"] for record in records if record["outlook_window_end"] is not None)
+    exposure_year = max(record["epiac_reference_year"] for record in records if record["epiac_reference_year"] is not None)
+    total_jobs = sum(record["jobs"] or 0 for record in records)
 
-    with open("scores.json") as f:
-        scores = {s["slug"]: s for s in json.load(f)}
+    weighted_high_share = sum((record["epiac_high_exposure_pct"] or 0) * (record["jobs"] or 0) for record in records if record["jobs"]) / total_jobs
+    weighted_aioe = sum((record["epiac_aioe"] or 0) * (record["jobs"] or 0) for record in records if record["jobs"]) / total_jobs
+    weighted_comp = sum((record["epiac_complementarity"] or 0) * (record["jobs"] or 0) for record in records if record["jobs"]) / total_jobs
+    helc_workers = sum((record["jobs"] or 0) * (record["epiac_helc_pct"] or 0) / 100 for record in records)
+    hehc_workers = sum((record["jobs"] or 0) * (record["epiac_hehc_pct"] or 0) / 100 for record in records)
+    low_workers = sum((record["jobs"] or 0) * (record["epiac_low_pct"] or 0) / 100 for record in records)
 
-    # Merge into unified records
-    records = []
-    for occ in occupations:
-        slug = occ["slug"]
-        row = csv_rows.get(slug, {})
-        score = scores.get(slug, {})
-        pay = int(row["median_pay_annual"]) if row.get("median_pay_annual") else None
-        jobs = int(row["num_jobs_2024"]) if row.get("num_jobs_2024") else None
-        records.append({
-            "title": occ["title"],
-            "slug": slug,
-            "category": row.get("category", occ.get("category", "")),
-            "pay": pay,
-            "jobs": jobs,
-            "outlook_pct": int(row["outlook_pct"]) if row.get("outlook_pct") else None,
-            "outlook_desc": row.get("outlook_desc", ""),
-            "education": row.get("entry_education", ""),
-            "exposure": score.get("exposure"),
-            "rationale": score.get("rationale", ""),
-            "url": occ.get("url", ""),
-        })
-
-    # Sort by exposure desc, then jobs desc
-    records.sort(key=lambda r: (-(r["exposure"] or 0), -(r["jobs"] or 0)))
-
-    lines = []
-
-    # ── Header ──
-    lines.append("# AI Exposure of the US Job Market")
-    lines.append("")
-    lines.append("This document contains structured data on 342 US occupations from the Bureau of Labor Statistics Occupational Outlook Handbook, each scored for AI exposure on a 0-10 scale by an LLM (Gemini Flash). Use this data to analyze, question, and discuss how AI will reshape the US labor market.")
-    lines.append("")
-    lines.append("Live visualization: https://karpathy.ai/jobs/")
-    lines.append("GitHub: https://github.com/karpathy/jobs")
-    lines.append("")
-
-    # ── Scoring methodology ──
-    lines.append("## Scoring methodology")
-    lines.append("")
-    lines.append("Each occupation was scored on a single AI Exposure axis from 0 to 10, measuring how much AI will reshape that occupation. The score considers both direct automation (AI doing the work) and indirect effects (AI making workers so productive that fewer are needed).")
-    lines.append("")
-    lines.append("A key heuristic: if the job can be done entirely from a home office on a computer — writing, coding, analyzing, communicating — then AI exposure is inherently high (7+), because AI capabilities in digital domains are advancing rapidly. Conversely, jobs requiring physical presence, manual skill, or real-time human interaction have a natural barrier.")
-    lines.append("")
-    lines.append("Calibration anchors:")
-    lines.append("- 0-1 Minimal: roofers, janitors, construction laborers")
-    lines.append("- 2-3 Low: electricians, plumbers, firefighters, dental hygienists")
-    lines.append("- 4-5 Moderate: registered nurses, police officers, veterinarians")
-    lines.append("- 6-7 High: teachers, managers, accountants, journalists")
-    lines.append("- 8-9 Very high: software developers, graphic designers, translators, paralegals")
-    lines.append("- 10 Maximum: data entry clerks, telemarketers")
-    lines.append("")
-
-    # ── Aggregate statistics ──
-    lines.append("## Aggregate statistics")
-    lines.append("")
-
-    total_jobs = sum(r["jobs"] or 0 for r in records)
-    total_wages = sum((r["jobs"] or 0) * (r["pay"] or 0) for r in records)
-
-    # Weighted avg exposure
-    w_sum = sum((r["exposure"] or 0) * (r["jobs"] or 0) for r in records if r["exposure"] is not None and r["jobs"])
-    w_count = sum(r["jobs"] or 0 for r in records if r["exposure"] is not None and r["jobs"])
-    w_avg = w_sum / w_count if w_count else 0
-
-    lines.append(f"- Total occupations: {len(records)}")
-    lines.append(f"- Total jobs: {total_jobs:,} ({total_jobs/1e6:.0f}M)")
-    lines.append(f"- Total annual wages: ${total_wages/1e12:.1f}T")
-    lines.append(f"- Job-weighted average AI exposure: {w_avg:.1f}/10")
-    lines.append("")
-
-    # Tier breakdown
-    tiers = [
-        ("Minimal (0-1)", 0, 1),
-        ("Low (2-3)", 2, 3),
-        ("Moderate (4-5)", 4, 5),
-        ("High (6-7)", 6, 7),
-        ("Very high (8-10)", 8, 10),
+    lines = [
+        "# AI Exposure of the Canadian Job Market",
+        "",
+        f"This document contains Statistics Canada occupation-group data for Canada. Employment and wages use annual tables through {jobs_year}, outlook uses province-aggregated ESDC data for {outlook_start}-{outlook_end}, and AI exposure uses StatCan's official EPIAC framework mapped from the {exposure_year} Census-based study.",
+        "",
+        "Sources:",
+        "- https://www150.statcan.gc.ca/t1/tbl1/en/tv.action?pid=1410041601",
+        "- https://www150.statcan.gc.ca/t1/tbl1/en/tv.action?pid=1410041701",
+        "- https://www150.statcan.gc.ca/n1/pub/11f0019m/11f0019m2024005-eng.htm",
+        "- https://open.canada.ca/data/en/dataset/b0e112e9-cf53-4e79-8838-23cd98debe5b/resource/cb52e1d0-ab62-4357-91cc-d8f5a2114e02",
+        "- https://www150.statcan.gc.ca/n1/en/pub/36-28-0001/2026001/article/00001-eng.pdf",
+        "- https://statistique.quebec.ca/fr/fichier/exposition-professions-intelligence-artificielle-2024.pdf",
+        "",
+        "## Aggregate statistics",
+        "",
+        f"- Occupation groups: {len(records)}",
+        f"- Total workers ({jobs_year}): {total_jobs:,} ({total_jobs / 1_000_000:.1f}M)",
+        f"- Job-weighted EPIAC high-exposure share: {weighted_high_share:.1f}%",
+        f"- Job-weighted AIOE: {weighted_aioe:.2f}",
+        f"- Job-weighted complementarity: {weighted_comp:.2f}",
+        f"- Estimated workers in HELC occupations: {fmt_jobs(round(helc_workers))}",
+        f"- Estimated workers in HEHC occupations: {fmt_jobs(round(hehc_workers))}",
+        f"- Estimated workers in low-exposure occupations: {fmt_jobs(round(low_workers))}",
+        f"- Trend window: {trend_from_year} to {jobs_year}",
+        f"- Outlook window: {outlook_start} to {outlook_end}",
+        "",
+        "## Exposure mix by EPIAC group",
+        "",
+        "| Group | Estimated workers | % of workers |",
+        "|-------|-------------------|--------------|",
+        f"| HELC | {fmt_jobs(round(helc_workers))} | {helc_workers / total_jobs * 100:.1f}% |",
+        f"| HEHC | {fmt_jobs(round(hehc_workers))} | {hehc_workers / total_jobs * 100:.1f}% |",
+        f"| Low exposure | {fmt_jobs(round(low_workers))} | {low_workers / total_jobs * 100:.1f}% |",
+        "",
+        f"## Occupations with the highest EPIAC high-exposure share ({exposure_year} mapping)",
+        "",
+        "| Occupation group | High-exposure share | Dominant EPIAC group | AIOE | Complementarity | Outlook | Workers |",
+        "|------------------|---------------------|----------------------|------|-----------------|---------|---------|",
     ]
-    lines.append("### Breakdown by exposure tier")
-    lines.append("")
-    lines.append("| Tier | Occupations | Jobs | % of jobs | Wages | % of wages | Avg pay |")
-    lines.append("|------|-------------|------|-----------|-------|------------|---------|")
-    for name, lo, hi in tiers:
-        group = [r for r in records if r["exposure"] is not None and lo <= r["exposure"] <= hi]
-        jobs = sum(r["jobs"] or 0 for r in group)
-        wages = sum((r["jobs"] or 0) * (r["pay"] or 0) for r in group)
-        avg_pay = wages / jobs if jobs else 0
-        lines.append(f"| {name} | {len(group)} | {fmt_jobs(jobs)} | {jobs/total_jobs*100:.1f}% | ${wages/1e12:.1f}T | {wages/total_wages*100:.1f}% | {fmt_pay(int(avg_pay))} |")
-    lines.append("")
 
-    # By pay band
-    lines.append("### Average exposure by pay band (job-weighted)")
-    lines.append("")
-    pay_bands = [
-        ("<$35K", 0, 35000),
-        ("$35-50K", 35000, 50000),
-        ("$50-75K", 50000, 75000),
-        ("$75-100K", 75000, 100000),
-        ("$100K+", 100000, float("inf")),
-    ]
-    lines.append("| Pay band | Avg exposure | Jobs |")
-    lines.append("|----------|-------------|------|")
-    for name, lo, hi in pay_bands:
-        group = [r for r in records if r["pay"] and lo <= r["pay"] < hi and r["exposure"] is not None and r["jobs"]]
-        if group:
-            ws = sum(r["exposure"] * r["jobs"] for r in group)
-            wc = sum(r["jobs"] for r in group)
-            lines.append(f"| {name} | {ws/wc:.1f} | {fmt_jobs(wc)} |")
-    lines.append("")
+    for record in records[:12]:
+        lines.append(
+            f"| {record['title']} | {record['epiac_high_exposure_pct']:.1f}% | {record['epiac_group_label'] or '?'} | {record['epiac_aioe']:.2f} | {record['epiac_complementarity']:.2f} | {record['outlook_label'] or '?'} | {fmt_jobs(record['jobs'])} |"
+        )
 
-    # By education
-    lines.append("### Average exposure by education level (job-weighted)")
-    lines.append("")
-    edu_groups = [
-        ("No degree / HS diploma", ["No formal educational credential", "High school diploma or equivalent"]),
-        ("Postsecondary / Associate's", ["Postsecondary nondegree award", "Some college, no degree", "Associate's degree"]),
-        ("Bachelor's", ["Bachelor's degree"]),
-        ("Master's", ["Master's degree"]),
-        ("Doctoral / Professional", ["Doctoral or professional degree"]),
-    ]
-    lines.append("| Education | Avg exposure | Jobs |")
-    lines.append("|-----------|-------------|------|")
-    for name, matches in edu_groups:
-        group = [r for r in records if r["education"] in matches and r["exposure"] is not None and r["jobs"]]
-        if group:
-            ws = sum(r["exposure"] * r["jobs"] for r in group)
-            wc = sum(r["jobs"] for r in group)
-            lines.append(f"| {name} | {ws/wc:.1f} | {fmt_jobs(wc)} |")
-    lines.append("")
+    growers = [record for record in records if record["trend_pct"] is not None]
+    growers.sort(key=lambda item: item["trend_pct"], reverse=True)
+    lines.extend(
+        [
+            "",
+            f"## Biggest growers since {trend_from_year}",
+            "",
+            "| Occupation group | High-exposure share | Dominant EPIAC group | Employment change | Workers | Median hourly wage |",
+            "|------------------|---------------------|----------------------|-------------------|---------|--------------------|",
+        ]
+    )
+    for record in growers[:10]:
+        lines.append(
+            f"| {record['title']} | {record['epiac_high_exposure_pct']:.1f}% | {record['epiac_group_label'] or '?'} | {record['trend_pct']:+.1f}% | {fmt_jobs(record['jobs'])} | {fmt_money(record['pay_hourly'])} |"
+        )
 
-    # BLS outlook vs exposure
-    lines.append("### BLS-projected declining occupations")
-    lines.append("")
-    declining = [r for r in records if r["outlook_pct"] is not None and r["outlook_pct"] < 0]
-    declining.sort(key=lambda r: r["outlook_pct"])
-    lines.append("| Occupation | Exposure | Outlook | Jobs |")
-    lines.append("|-----------|----------|---------|------|")
-    for r in declining:
-        lines.append(f"| {r['title']} | {r['exposure']}/10 | {r['outlook_pct']:+d}% | {fmt_jobs(r['jobs'])} |")
-    lines.append("")
-
-    lines.append("### Fastest-growing occupations (10%+ projected growth)")
-    lines.append("")
-    growing = [r for r in records if r["outlook_pct"] is not None and r["outlook_pct"] >= 10]
-    growing.sort(key=lambda r: -r["outlook_pct"])
-    lines.append("| Occupation | Exposure | Outlook | Jobs |")
-    lines.append("|-----------|----------|---------|------|")
-    for r in growing:
-        lines.append(f"| {r['title']} | {r['exposure']}/10 | +{r['outlook_pct']}% | {fmt_jobs(r['jobs'])} |")
-    lines.append("")
-
-    # ── Full occupation table ──
-    lines.append("## All 342 occupations")
-    lines.append("")
-    lines.append("Sorted by AI exposure (descending), then by number of jobs (descending).")
-    lines.append("")
-
-    for score in range(10, -1, -1):
-        group = [r for r in records if r["exposure"] == score]
-        if not group:
-            continue
-        group_jobs = sum(r["jobs"] or 0 for r in group)
-        lines.append(f"### Exposure {score}/10 ({len(group)} occupations, {fmt_jobs(group_jobs)} jobs)")
+    lines.extend(["", f"## All {len(records)} occupation groups", ""])
+    for record in records:
+        source_note = record["epiac_source_note"].replace("|", "/")
+        change = f"{record['trend_pct']:+.1f}%" if record["trend_pct"] is not None else "?"
+        unemployment = f"{record['unemployment_rate']:.1f}%" if record["unemployment_rate"] is not None else "?"
+        lines.append(f"### {record['title']}")
         lines.append("")
-        lines.append("| # | Occupation | Pay | Jobs | Outlook | Education | Rationale |")
-        lines.append("|---|-----------|-----|------|---------|-----------|-----------|")
-        for i, r in enumerate(group, 1):
-            outlook = f"{r['outlook_pct']:+d}%" if r["outlook_pct"] is not None else "?"
-            edu = r["education"] if r["education"] else "?"
-            # Truncate education for readability
-            edu_short = {
-                "High school diploma or equivalent": "HS diploma",
-                "Bachelor's degree": "Bachelor's",
-                "Master's degree": "Master's",
-                "Doctoral or professional degree": "Doctoral",
-                "Associate's degree": "Associate's",
-                "Postsecondary nondegree award": "Postsecondary",
-                "No formal educational credential": "No formal",
-                "Some college, no degree": "Some college",
-                "See How to Become One": "Varies",
-            }.get(edu, edu)
-            rationale = r["rationale"].replace("|", "/").replace("\n", " ")
-            lines.append(f"| {i} | {r['title']} | {fmt_pay(r['pay'])} | {fmt_jobs(r['jobs'])} | {outlook} | {edu_short} | {rationale} |")
+        lines.append("| Field | Value |")
+        lines.append("|-------|-------|")
+        lines.append(f"| NOC | {record['noc_code']} |")
+        lines.append(f"| Category | {record['category']} |")
+        lines.append(f"| Workers | {fmt_jobs(record['jobs'])} |")
+        lines.append(f"| High-exposure share | {record['epiac_high_exposure_pct']:.1f}% |")
+        lines.append(f"| Dominant EPIAC group | {record['epiac_group_label'] or '?'} |")
+        lines.append(f"| AIOE | {record['epiac_aioe']:.2f} |")
+        lines.append(f"| Complementarity | {record['epiac_complementarity']:.2f} |")
+        lines.append(f"| HELC / HEHC / Low | {record['epiac_helc_pct']:.1f}% / {record['epiac_hehc_pct']:.1f}% / {record['epiac_low_pct']:.1f}% |")
+        lines.append(f"| Employment change | {change} |")
+        lines.append(f"| Unemployment | {unemployment} |")
+        lines.append(f"| Median hourly wage | {fmt_money(record['pay_hourly'])} |")
+        lines.append(f"| Outlook | {record['outlook_label'] or '?'} |")
+        lines.append(f"| Mapping note | {source_note} |")
         lines.append("")
 
-    # Write
-    text = "\n".join(lines)
-    with open("prompt.md", "w") as f:
-        f.write(text)
+    with open("prompt.md", "w", encoding="utf-8") as handle:
+        handle.write("\n".join(lines) + "\n")
 
-    print(f"Wrote prompt.md ({len(text):,} chars, {len(lines):,} lines)")
+    print(f"Wrote prompt.md with {len(records)} occupation groups")
 
 
 if __name__ == "__main__":

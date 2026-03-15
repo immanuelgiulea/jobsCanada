@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Occupation Detail</title>
+<style>
+*,*::before,*::after{box-sizing:border-box}
+:root{--bg:#0a0d12;--panel:rgba(255,255,255,.04);--line:rgba(255,255,255,.08);--fg:#eef2fb;--fg2:#99a3b6;--accent:#d85a1f;--good:#7bb852;--muted:#6d7890}
+html,body{margin:0;min-height:100%;background:radial-gradient(circle at top right,rgba(216,90,31,.10),transparent 28%),radial-gradient(circle at bottom left,rgba(123,184,82,.10),transparent 24%),var(--bg);color:var(--fg);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif}
+a{color:inherit}
+body{padding:24px 18px 44px}
+.page-nav{display:flex;justify-content:flex-start;margin:0 0 18px}
+.shell{max-width:1180px;margin:0 auto}
+.back-link{display:inline-flex;align-items:center;gap:8px;padding:10px 14px;border-radius:999px;text-decoration:none;background:rgba(255,255,255,.04);border:1px solid var(--line);color:var(--fg2);font-size:13px}
+.back-link:hover{background:rgba(255,255,255,.07);color:var(--fg)}
+.hero,.panel{background:linear-gradient(180deg,rgba(18,23,34,.96),rgba(11,14,20,.96));border:1px solid var(--line);border-radius:20px;box-shadow:0 20px 60px rgba(0,0,0,.28)}
+.hero,.panel{padding:18px}
+.hero{display:flex;flex-direction:column;gap:12px}
+.eyebrow{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:rgba(255,255,255,.48);font-weight:700}
+h1{margin:0;font-size:34px;line-height:1.05;letter-spacing:-.04em;max-width:900px}
+.summary{color:var(--fg2);font-size:14px;line-height:1.6;max-width:920px}
+.meta-row{display:flex;flex-wrap:wrap;gap:10px}
+.pill{display:inline-flex;align-items:center;gap:8px;padding:8px 12px;border-radius:999px;border:1px solid var(--line);background:rgba(255,255,255,.03);font-size:12px;color:var(--fg2)}
+.layout{display:flex;flex-direction:column;gap:18px}
+.top-grid,.bottom-grid{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(300px,.92fr);gap:18px}
+.top-grid{align-items:stretch}
+.top-grid>*{height:100%}
+.panel h2{margin:0 0 14px;font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:rgba(255,255,255,.48)}
+.panel-muted{background:linear-gradient(180deg,rgba(15,19,28,.88),rgba(10,13,18,.92))}
+.metrics-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.metric{padding:16px;border-radius:18px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);display:flex;flex-direction:column;justify-content:space-between;gap:12px;min-height:138px}
+.metric.emphasis{background:linear-gradient(180deg,rgba(255,255,255,.045),rgba(255,255,255,.025));border-color:rgba(255,255,255,.1)}
+.metric-label{font-size:11px;letter-spacing:.10em;text-transform:uppercase;color:rgba(255,255,255,.46)}
+.metric-value{font-size:34px;font-weight:730;letter-spacing:-.05em;line-height:1}
+.metric-value.metric-text{font-size:24px;line-height:1.08}
+.metric-value.metric-large{font-size:46px}
+.metric-sub{font-size:13px;color:var(--fg2);line-height:1.45}
+.stack{display:flex;flex-direction:column;gap:10px}
+.mix-row{display:grid;grid-template-columns:120px 1fr 64px;gap:12px;align-items:center;font-size:13px}
+.mix-label{color:var(--fg2)}
+.mix-bar{height:12px;border-radius:999px;background:rgba(255,255,255,.06);overflow:hidden;position:relative}
+.mix-fill{height:100%;border-radius:999px}
+.table{display:grid;grid-template-columns:220px 1fr;gap:10px 18px;font-size:14px;line-height:1.5}
+.table dt{color:var(--fg2)}
+.table dd{margin:0}
+.note{padding:14px 16px;border-radius:16px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);font-size:14px;line-height:1.6;color:var(--fg2)}
+.sub-label{margin:0 0 10px;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.46)}
+.source-tags{display:flex;flex-wrap:wrap;gap:8px}
+.source-tag{display:inline-flex;align-items:center;padding:8px 12px;border-radius:999px;border:1px solid rgba(255,255,255,.05);background:rgba(255,255,255,.025);font-size:12px;color:var(--fg2)}
+.link-row{display:grid;grid-template-columns:1fr;gap:10px}
+.source-link{display:inline-flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 13px;border-radius:12px;text-decoration:none;border:1px solid rgba(255,255,255,.06);background:rgba(255,255,255,.025);font-size:13px;color:var(--fg2)}
+.source-link:hover{background:rgba(255,255,255,.05);color:var(--fg)}
+.loading,.empty{padding:18px;border-radius:18px;background:rgba(255,255,255,.03);border:1px solid var(--line);font-size:15px;color:var(--fg2)}
+@media (max-width:1080px){.top-grid,.bottom-grid,.metrics-grid,.table,.mix-row{grid-template-columns:1fr}.top-grid>*{height:auto}h1{font-size:30px}.metric-value.metric-large{font-size:38px}}
+@media (max-width:720px){.metrics-grid{grid-template-columns:1fr}.table{grid-template-columns:1fr}.mix-row{grid-template-columns:1fr}.hero,.panel{border-radius:18px;padding:16px}.metric{min-height:0}.metric-value{font-size:30px}.metric-value.metric-text{font-size:22px}.metric-value.metric-large{font-size:34px}h1{font-size:28px}}
+@media (max-width:640px){body{padding:18px 14px 34px}.page-nav{margin-bottom:14px}}
+</style>
+</head>
+<body>
+<div class="page-nav">
+  <a class="back-link" href="./">Back to dashboard</a>
+</div>
+<div class="shell">
+  <div id="app" class="loading">Loading occupation details...</div>
+</div>
+<script>
+function formatCompact(value){if(value==null)return"-";if(value>=1e6)return(value/1e6).toFixed(1)+"M";if(value>=1e3)return Math.round(value/1e3)+"K";return value.toLocaleString()}
+function formatMoney(value){return value==null?"-":"$"+value.toFixed(2)}
+function formatPercent(value){return value==null?"-":value.toFixed(1)+"%"}
+function formatSignedPercent(value){return value==null?"-":(value>0?"+":"")+value.toFixed(1)+"%"}
+function formatDecimal(value){return value==null?"-":Number(value).toFixed(2)}
+function escapeHTML(value){return String(value).replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;").replaceAll("'","&#39;")}
+function groupColor(code){if(code==="HELC")return"#d85a1f";if(code==="HEHC")return"#7bb852";return"#6d7890"}
+function params(){return new URLSearchParams(window.location.search)}
+function renderNotFound(){document.title="Occupation not found";document.getElementById("app").outerHTML='<div class="empty">No occupation matched that link. Return to the <a href="./">dashboard</a> and try again.</div>'}
+function sourceLink(url,label){if(!url)return"";return `<a class="source-link" href="${url}" target="_blank" rel="noopener">${escapeHTML(label)}</a>`}
+fetch("data.json").then(response=>{if(!response.ok)throw new Error(`HTTP ${response.status}`);return response.json()}).then(payload=>{
+  const slug=params().get("slug");
+  const meta=payload.meta||{};
+  const occupation=(payload.occupations||[]).find(item=>item.slug===slug);
+  if(!occupation){renderNotFound();return}
+  document.title=`${occupation.title} | AI Exposure of the Canadian Job Market`;
+  const exposureYear=occupation.epiac_reference_year||meta.exposure_reference_year||2021;
+  const jobsYear=occupation.jobs_year||meta.jobs_year||"";
+  const trendWindow=occupation.trend_from_year!=null&&jobsYear?`${occupation.trend_from_year}-${jobsYear}`:"recent";
+  const outlookWindow=occupation.outlook_window_start&&occupation.outlook_window_end?`${occupation.outlook_window_start}-${occupation.outlook_window_end}`:`${meta.outlook_window_start||2025}-${meta.outlook_window_end||2027}`;
+  const sourceGroups=(occupation.epiac_source_groups||[]).map(group=>`<span class="source-tag">${escapeHTML(group)}</span>`).join("");
+  const groupLabel=occupation.epiac_group_label||"EPIAC group unavailable";
+  const outlookLabel=occupation.outlook_label||"Undetermined";
+  const rationale=occupation.exposure_rationale||"No mapping note available.";
+  document.getElementById("app").outerHTML=`
+    <div class="layout">
+      <div class="top-grid">
+        <section class="hero">
+          <div class="eyebrow">NOC ${escapeHTML(occupation.noc_code)} / Canada / ${jobsYear}</div>
+          <h1>${escapeHTML(occupation.title)}</h1>
+          <div class="summary">${escapeHTML(occupation.category)}. This detail page combines annual ${jobsYear} StatCan labour-market data, the mapped official StatCan EPIAC exposure fields, and the aggregated ESDC outlook for ${outlookWindow}.</div>
+          <div class="meta-row">
+            <span class="pill">${formatCompact(occupation.jobs)} employed (${jobsYear} annual avg.)</span>
+            <span class="pill">${formatMoney(occupation.pay_hourly)} median hourly wage</span>
+            <span class="pill" style="color:${groupColor(occupation.epiac_group_code)};border-color:rgba(255,255,255,.12)">${escapeHTML(groupLabel)}</span>
+          </div>
+          <div class="note" style="font-size:13px">This page uses annual StatCan occupation data for ${jobsYear}. The monthly StatCan cube 14-10-0310-01 is seasonally adjusted and publishes broader occupation groups, so its current figures are not directly comparable to this page.</div>
+        </section>
+        <section class="panel epiac-panel">
+          <h2>EPIAC Mix</h2>
+          <div class="stack">
+            <div class="mix-row"><div class="mix-label">HELC</div><div class="mix-bar"><div class="mix-fill" style="width:${occupation.epiac_helc_pct||0}%;background:${groupColor("HELC")}"></div></div><div>${formatPercent(occupation.epiac_helc_pct)}</div></div>
+            <div class="mix-row"><div class="mix-label">HEHC</div><div class="mix-bar"><div class="mix-fill" style="width:${occupation.epiac_hehc_pct||0}%;background:${groupColor("HEHC")}"></div></div><div>${formatPercent(occupation.epiac_hehc_pct)}</div></div>
+            <div class="mix-row"><div class="mix-label">Low exposure</div><div class="mix-bar"><div class="mix-fill" style="width:${occupation.epiac_low_pct||0}%;background:${groupColor("LOW")}"></div></div><div>${formatPercent(occupation.epiac_low_pct)}</div></div>
+          </div>
+          <div class="note" style="margin-top:14px">Reference year for the mapped EPIAC fields: ${exposureYear}. Dashboard ranking is based on high-exposure share, but the raw AIOE and complementarity values are preserved on this page.</div>
+          <div class="note" style="margin-top:12px"><div class="sub-label">Mapped Published EPIAC Groups</div><div class="source-tags">${sourceGroups||'<span class="source-tag">No source groups listed</span>'}</div></div>
+        </section>
+      </div>
+      <section class="panel">
+        <h2>Key Metrics</h2>
+        <div class="metrics-grid">
+          <div class="metric emphasis">
+            <div class="metric-label">High-Exposure Share</div>
+            <div class="metric-value metric-large">${formatPercent(occupation.epiac_high_exposure_pct)}</div>
+            <div class="metric-sub">Share of workers mapped to high-exposure EPIAC occupations.</div>
+          </div>
+          <div class="metric">
+            <div class="metric-label">Dominant EPIAC Group</div>
+            <div class="metric-value metric-text" style="color:${groupColor(occupation.epiac_group_code)}">${escapeHTML(groupLabel)}</div>
+            <div class="metric-sub">Official StatCan grouping for the mapped exposure mix.</div>
+          </div>
+          <div class="metric">
+            <div class="metric-label">AIOE</div>
+            <div class="metric-value">${formatDecimal(occupation.epiac_aioe)}</div>
+            <div class="metric-sub">Raw AI occupational exposure index.</div>
+          </div>
+          <div class="metric">
+            <div class="metric-label">Complementarity</div>
+            <div class="metric-value">${formatDecimal(occupation.epiac_complementarity)}</div>
+            <div class="metric-sub">Higher values imply more AI-worker complementarity.</div>
+          </div>
+          <div class="metric">
+            <div class="metric-label">CAIOE</div>
+            <div class="metric-value">${formatDecimal(occupation.epiac_caioe)}</div>
+            <div class="metric-sub">Complementarity-adjusted AI occupational exposure.</div>
+          </div>
+          <div class="metric">
+            <div class="metric-label">Employment Change</div>
+            <div class="metric-value">${formatSignedPercent(occupation.trend_pct)}</div>
+            <div class="metric-sub">Trend window: ${trendWindow}.</div>
+          </div>
+          <div class="metric">
+            <div class="metric-label">Outlook</div>
+            <div class="metric-value metric-text">${escapeHTML(outlookLabel)}</div>
+            <div class="metric-sub">ESDC outlook for ${outlookWindow}.</div>
+          </div>
+          <div class="metric">
+            <div class="metric-label">Unemployment</div>
+            <div class="metric-value">${formatPercent(occupation.unemployment_rate)}</div>
+            <div class="metric-sub">StatCan annual rate for ${jobsYear}.</div>
+          </div>
+        </div>
+      </section>
+      <div class="bottom-grid">
+        <section class="panel">
+          <h2>Occupation Profile</h2>
+          <dl class="table">
+            <dt>Occupation family</dt><dd>${escapeHTML(occupation.category)}</dd>
+            <dt>Employed (${jobsYear} annual avg.)</dt><dd>${formatCompact(occupation.jobs)}</dd>
+            <dt>Paid employees (${jobsYear} annual avg.)</dt><dd>${formatCompact(occupation.employees)}</dd>
+            <dt>Employment share (${jobsYear})</dt><dd>${formatPercent(occupation.employment_share_pct)}</dd>
+            <dt>Men / women share</dt><dd>${formatPercent(occupation.men_share_pct)} / ${formatPercent(occupation.women_share_pct)}</dd>
+            <dt>Median hourly / weekly wage</dt><dd>${formatMoney(occupation.pay_hourly)} / ${formatMoney(occupation.pay_weekly)}</dd>
+          </dl>
+        </section>
+        <section class="panel panel-muted references">
+          <h2>References</h2>
+          <div class="note">${escapeHTML(rationale)}</div>
+          <div class="link-row">
+            ${sourceLink(occupation.employment_url,"StatCan annual employment table")}
+            ${sourceLink("https://www150.statcan.gc.ca/t1/tbl1/en/tv.action?pid=1410031001","StatCan monthly employment cube")}
+            ${sourceLink(occupation.wages_url,"StatCan annual wages table")}
+            ${sourceLink(occupation.epiac_source_url,"StatCan EPIAC study")}
+            ${sourceLink(occupation.outlook_url,"ESDC outlook dataset")}
+          </div>
+        </section>
+      </div>
+    </div>`;
+}).catch(error=>{console.error(error);document.getElementById("app").outerHTML='<div class="empty">Failed to load occupation details.</div>'});
+</script>
+</body>
+</html>
+
