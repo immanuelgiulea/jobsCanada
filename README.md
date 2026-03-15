@@ -91,3 +91,32 @@ uv run python score.py
 - The StatCan downloads are cached in `tmp/statcan/`.
 - `pages/` is generated output and can be recreated from `fetch_statcan.py`.
 - The EPIAC mapping is an inference from the closest published StatCan occupation groups to the current NOC 2021 dashboard groups. Each generated row and page includes a mapping note.
+
+## Backlog
+
+1. `[x]` Add full geography mode to the current 43-group dashboard.
+   Implemented in the current repo: the fetch/build pipeline now emits `stats_by_geo`, the site includes a geography selector, and the dashboard switches labour-market metrics and outlook by geography while keeping EPIAC national.
+
+2. `[ ]` Replace the remaining legacy U.S. detail/profile layer with latest-official OaSIS data.
+   Add an importer that discovers the latest official OaSIS version at fetch time, records the resolved version in generated metadata, and maps OaSIS unit groups and occupational profiles onto the existing 43 dashboard groups.
+
+3. `[ ]` Add family pages for each dashboard occupation group.
+   Clicking a dashboard group should open a dedicated family page for that group and the selected geography, showing the labour-market summary, matching NOC unit groups, and nested OaSIS occupational profiles inside that family.
+
+4. `[ ]` Add global NOC search and deep linking.
+   Add one search input that matches dashboard group codes, unit-group codes, occupational profile codes, titles, and aliases, and route exact hits to the correct family page and focused result.
+
+5. `[ ]` Map the 44 occupations from GDPval onto the dashboard.
+   Only ship a direct mapping if the correspondence to the current 43 dashboard groups is explicit and auditable; otherwise present GDPval in a separate comparison view at its own grain.
+
+6. `[ ]` Add task-level exposure estimates from Eloundou et al. (2023).
+   Evaluate whether the paper's task-speedup framework should attach to OaSIS tasks/profiles or stay in a separate research layer, while preserving the original methodological framing.
+
+7. `[ ]` Add a view for academic research overlays.
+   Create a dedicated research view that can compare or summarize academic measures such as AIOE, task-level exposure, and other defensible research inputs without overloading the main dashboard view.
+
+8. `[ ]` Add a view for industry research overlays.
+   Create a separate industry research view so private-sector methodologies can be shown alongside, but not conflated with, the official StatCan/ESDC pipeline and academic measures.
+
+9. `[ ]` Add EN/FR language switching last.
+   Implement the bilingual toggle only after the data model, routes, labels, and research views stabilize, covering dashboard copy, family/profile pages, navigation, search labels, and research-view text.
