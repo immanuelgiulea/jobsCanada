@@ -1,14 +1,13 @@
-# AI Exposure of the US Job Market
+# AI Exposure of the Canadian Job Market
+>> Forked from karpathy. Cooked with Codex.
 
-Analyzing how susceptible every occupation in the US economy is to AI and automation, using data from the Bureau of Labor Statistics [Occupational Outlook Handbook](https://www.bls.gov/ooh/) (OOH).
-
-**Live demo: [karpathy.ai/jobs](https://karpathy.ai/jobs/)**
+**Live demo US data: [karpathy.ai/jobs](https://karpathy.ai/jobs/)**
 
 ![AI Exposure Treemap](jobs.png)
 
 ## What's here
 
-The BLS OOH covers **342 occupations** spanning every sector of the US economy, with detailed data on job duties, work environment, education requirements, pay, and employment projections. We scraped all of it, scored each occupation's AI exposure using an LLM, and built an interactive treemap visualization.
+>> [need to edit this] The BLS OOH covers **342 occupations** spanning every sector of the US economy, with detailed data on job duties, work environment, education requirements, pay, and employment projections. We scraped all of it, scored each occupation's AI exposure using an LLM, and built an interactive treemap visualization.
 
 ## Data pipeline
 
@@ -39,6 +38,8 @@ A key signal is whether the job's work product is fundamentally digital — if t
 
 **Calibration examples from the dataset:**
 
+>> [need to confirm this]
+>> 
 | Score | Meaning | Examples |
 |-------|---------|---------|
 | 0-1 | Minimal | Roofers, janitors, construction laborers |
