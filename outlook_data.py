@@ -3,8 +3,8 @@ Download and aggregate ESDC 3-year employment outlooks for NOC 2021 groups.
 
 The workbook is published on the Open Government Portal and contains outlook
 labels plus narrative text for each unit-group NOC by province and economic
-region. This module uses province-total rows to build a Canada-wide outlook for
-unit groups, then lets callers roll those values up to broader NOC prefixes.
+region. This module rolls those unit-group outlooks up by geography and also
+builds a Canada-wide aggregate by weighting the geography-level rows together.
 """
 
 from __future__ import annotations
@@ -16,6 +16,8 @@ from datetime import datetime, timedelta
 from html import unescape
 from pathlib import Path
 from urllib.request import urlopen
+
+from geography import DEFAULT_GEO_CODE, OUTLOOK_GEO_TO_CODE, OUTLOOK_REGION_NAMES
 
 OUTLOOK_PAGE_URL = (
     "https://open.canada.ca/data/en/dataset/"
@@ -38,22 +40,6 @@ OUTLOOK_DIR = Path("tmp/outlook")
 SHEET_PATH = "xl/worksheets/sheet1.xml"
 XML_NS = "{http://schemas.openxmlformats.org/spreadsheetml/2006/main}"
 EXCEL_EPOCH = datetime(1899, 12, 30)
-
-PROVINCE_NAMES = {
-    "NL": "Newfoundland and Labrador",
-    "PE": "Prince Edward Island",
-    "NS": "Nova Scotia",
-    "NB": "New Brunswick",
-    "QC": "Quebec",
-    "ON": "Ontario",
-    "MB": "Manitoba",
-    "SK": "Saskatchewan",
-    "AB": "Alberta",
-    "BC": "British Columbia",
-    "YK": "Yukon",
-    "NT": "Northwest Territories",
-    "NU": "Nunavut",
-}
 
 OUTLOOK_LABEL_TO_SCORE = {
     "Very limited": -2.0,
@@ -138,9 +124,12 @@ def province_total_rows(workbook_path: Path) -> list[dict[str, str]]:
         province = row.get("Province", "")
         if row.get("LANG") and row["LANG"] != "EN":
             continue
-        if PROVINCE_NAMES.get(province) != row.get("Economic Region Name", ""):
+        geo_code = OUTLOOK_GEO_TO_CODE.get(province)
+        if not geo_code:
             continue
-        rows.append(row)
+        if OUTLOOK_REGION_NAMES.get(province) != row.get("Economic Region Name", ""):
+            continue
+        rows.append({**row, "_geo_code": geo_code})
     return rows
 
 
@@ -166,9 +155,38 @@ def expand_group_prefixes(group_code: str) -> list[str]:
     return prefixes
 
 
-def build_unit_outlooks(workbook_path: Path) -> dict[str, dict[str, object]]:
-    by_code: dict[str, list[dict[str, object]]] = {}
+def summarize_outlook_entries(entries: list[dict[str, object]]) -> dict[str, object]:
+    valid = [entry for entry in entries if entry["outlook_score"] is not None]
+    weighted = [entry for entry in valid if entry["employment_weight"]]
+
+    if weighted:
+        total_weight = sum(int(entry["employment_weight"]) for entry in weighted)
+        avg_score = sum(float(entry["outlook_score"]) * int(entry["employment_weight"]) for entry in weighted) / total_weight
+    elif valid:
+        total_weight = len(valid)
+        avg_score = sum(float(entry["outlook_score"]) for entry in valid) / total_weight
+    else:
+        total_weight = 0
+        avg_score = None
+
+    release_dates = sorted({entry["release_date"] for entry in entries if entry["release_date"]})
+    return {
+        "avg_score": avg_score,
+        "label": label_from_score(avg_score),
+        "release_date": release_dates[-1] if release_dates else None,
+        "entry_count": len(entries),
+        "valid_count": len(valid),
+        "total_weight": total_weight,
+        "is_weighted": bool(weighted),
+    }
+
+
+def build_unit_outlooks(workbook_path: Path) -> dict[str, dict[str, dict[str, object]]]:
+    by_geo_and_code: dict[str, dict[str, list[dict[str, object]]]] = {}
     for row in province_total_rows(workbook_path):
+        geo_code = row.get("_geo_code")
+        if not geo_code:
+            continue
         code = row.get("NOC_Code", "").replace("NOC_", "")
         if not code:
             continue
@@ -180,44 +198,38 @@ def build_unit_outlooks(workbook_path: Path) -> dict[str, dict[str, object]]:
             "employment_weight": extract_employment_count(row.get("Employment Trends", "")),
             "release_date": parse_release_date(row.get("Release Date", "")),
         }
-        by_code.setdefault(code, []).append(entry)
+        by_geo_and_code.setdefault(str(geo_code), {}).setdefault(code, []).append(entry)
 
-    unit_outlooks: dict[str, dict[str, object]] = {}
-    for code, rows in by_code.items():
-        valid = [row for row in rows if row["outlook_score"] is not None]
-        weighted = [row for row in valid if row["employment_weight"]]
-
-        if weighted:
-            total_weight = sum(int(row["employment_weight"]) for row in weighted)
-            avg_score = sum(float(row["outlook_score"]) * int(row["employment_weight"]) for row in weighted) / total_weight
-            employment_weight = total_weight
-        elif valid:
-            total_weight = len(valid)
-            avg_score = sum(float(row["outlook_score"]) for row in valid) / total_weight
-            employment_weight = None
-        else:
-            avg_score = None
-            employment_weight = None
-
-        release_dates = sorted({row["release_date"] for row in rows if row["release_date"]})
-        unit_outlooks[code] = {
-            "title": rows[0]["title"],
-            "outlook_label": label_from_score(avg_score),
-            "outlook_score": round(avg_score, 2) if avg_score is not None else None,
-            "employment_weight": employment_weight,
-            "province_count": len(valid),
-            "province_total_count": len(rows),
-            "release_date": release_dates[-1] if release_dates else None,
-        }
+    unit_outlooks: dict[str, dict[str, dict[str, object]]] = {}
+    for geo_code, rows_by_code in by_geo_and_code.items():
+        unit_outlooks[geo_code] = {}
+        for code, rows in rows_by_code.items():
+            summary = summarize_outlook_entries(rows)
+            unit_outlooks[geo_code][code] = {
+                "title": rows[0]["title"],
+                "outlook_label": summary["label"],
+                "outlook_score": round(summary["avg_score"], 2) if summary["avg_score"] is not None else None,
+                "employment_weight": summary["total_weight"] if summary["is_weighted"] else None,
+                "row_count": summary["entry_count"],
+                "valid_row_count": summary["valid_count"],
+                "release_date": summary["release_date"],
+            }
 
     return unit_outlooks
 
 
-def load_group_outlooks(group_codes: list[str]) -> tuple[dict[str, dict[str, object]], dict[str, object]]:
+def load_group_outlooks(group_codes: list[str]) -> tuple[dict[str, dict[str, dict[str, object]]], dict[str, object]]:
     workbook_path = ensure_outlook_workbook()
-    unit_outlooks = build_unit_outlooks(workbook_path)
+    unit_outlooks_by_geo = build_unit_outlooks(workbook_path)
 
-    release_dates = sorted({entry["release_date"] for entry in unit_outlooks.values() if entry["release_date"]})
+    release_dates = sorted(
+        {
+            entry["release_date"]
+            for geo_entries in unit_outlooks_by_geo.values()
+            for entry in geo_entries.values()
+            if entry["release_date"]
+        }
+    )
     metadata = {
         "title": OUTLOOK_TITLE,
         "page_url": OUTLOOK_PAGE_URL,
@@ -225,44 +237,62 @@ def load_group_outlooks(group_codes: list[str]) -> tuple[dict[str, dict[str, obj
         "window_start": OUTLOOK_WINDOW_START,
         "window_end": OUTLOOK_WINDOW_END,
         "release_date": release_dates[-1] if release_dates else None,
-        "unit_group_count": len(unit_outlooks),
+        "unit_group_count": sum(len(geo_entries) for geo_entries in unit_outlooks_by_geo.values()),
+        "geography_count": len(unit_outlooks_by_geo),
     }
 
-    group_outlooks: dict[str, dict[str, object]] = {}
+    group_outlooks: dict[str, dict[str, dict[str, object]]] = {DEFAULT_GEO_CODE: {}}
     for group_code in group_codes:
         prefixes = expand_group_prefixes(group_code)
-        matches = [
-            entry
-            for code, entry in unit_outlooks.items()
-            if any(code.startswith(prefix) for prefix in prefixes)
-        ]
-        if not matches:
-            continue
+        canada_matches: list[dict[str, object]] = []
 
-        valid = [entry for entry in matches if entry["outlook_score"] is not None]
-        weighted = [entry for entry in valid if entry["employment_weight"]]
+        for geo_code, geo_entries in unit_outlooks_by_geo.items():
+            matches = [
+                entry
+                for code, entry in geo_entries.items()
+                if any(code.startswith(prefix) for prefix in prefixes)
+            ]
+            if not matches:
+                continue
 
-        if weighted:
-            total_weight = sum(int(entry["employment_weight"]) for entry in weighted)
-            avg_score = sum(float(entry["outlook_score"]) * int(entry["employment_weight"]) for entry in weighted) / total_weight
-        elif valid:
-            total_weight = len(valid)
-            avg_score = sum(float(entry["outlook_score"]) for entry in valid) / total_weight
-        else:
-            total_weight = 0
-            avg_score = None
+            canada_matches.extend(matches)
+            summary = summarize_outlook_entries(matches)
+            group_outlooks.setdefault(geo_code, {})[group_code] = {
+                "outlook_label": summary["label"],
+                "outlook_score": round(summary["avg_score"], 2) if summary["avg_score"] is not None else None,
+                "outlook_window_start": OUTLOOK_WINDOW_START,
+                "outlook_window_end": OUTLOOK_WINDOW_END,
+                "outlook_release_date": summary["release_date"] or metadata["release_date"],
+                "outlook_source_url": OUTLOOK_PAGE_URL,
+                "outlook_unit_count": summary["entry_count"],
+                "outlook_unit_valid_count": summary["valid_count"],
+                "outlook_weight_basis": (
+                    "employment_weighted_unit_outlooks"
+                    if summary["is_weighted"]
+                    else "average_unit_outlooks"
+                    if summary["valid_count"]
+                    else "undetermined"
+                ),
+            }
 
-        release_date_candidates = sorted({entry["release_date"] for entry in matches if entry["release_date"]})
-        group_outlooks[group_code] = {
-            "outlook_label": label_from_score(avg_score),
-            "outlook_score": round(avg_score, 2) if avg_score is not None else None,
-            "outlook_window_start": OUTLOOK_WINDOW_START,
-            "outlook_window_end": OUTLOOK_WINDOW_END,
-            "outlook_release_date": release_date_candidates[-1] if release_date_candidates else metadata["release_date"],
-            "outlook_source_url": OUTLOOK_PAGE_URL,
-            "outlook_unit_count": len(matches),
-            "outlook_unit_valid_count": len(valid),
-            "outlook_weight_basis": "employment_weighted_provincial_outlooks" if weighted else "average_provincial_outlooks" if valid else "undetermined",
-        }
+        if canada_matches:
+            summary = summarize_outlook_entries(canada_matches)
+            group_outlooks[DEFAULT_GEO_CODE][group_code] = {
+                "outlook_label": summary["label"],
+                "outlook_score": round(summary["avg_score"], 2) if summary["avg_score"] is not None else None,
+                "outlook_window_start": OUTLOOK_WINDOW_START,
+                "outlook_window_end": OUTLOOK_WINDOW_END,
+                "outlook_release_date": summary["release_date"] or metadata["release_date"],
+                "outlook_source_url": OUTLOOK_PAGE_URL,
+                "outlook_unit_count": summary["entry_count"],
+                "outlook_unit_valid_count": summary["valid_count"],
+                "outlook_weight_basis": (
+                    "employment_weighted_geography_outlooks"
+                    if summary["is_weighted"]
+                    else "average_geography_outlooks"
+                    if summary["valid_count"]
+                    else "undetermined"
+                ),
+            }
 
     return group_outlooks, metadata

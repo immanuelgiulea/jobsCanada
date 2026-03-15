@@ -13,6 +13,8 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
+from geography import DEFAULT_GEO_CODE, GEO_METADATA
+
 
 SITE_DIR = Path("site")
 OUTPUT_PATH = SITE_DIR / "data.json"
@@ -32,6 +34,32 @@ def as_int(value):
 
 def as_float(value):
     return float(value) if value not in (None, "") else None
+
+
+def parse_stats_by_geo(value):
+    raw = json.loads(value) if value else {}
+    parsed = {}
+    for geo in GEO_METADATA:
+        stats = raw.get(geo["code"], {})
+        parsed[geo["code"]] = {
+            "jobs": as_int(stats.get("jobs")),
+            "jobs_year": as_int(stats.get("jobs_year")),
+            "trend_pct": as_float(stats.get("trend_pct")),
+            "trend_from_year": as_int(stats.get("trend_from_year")),
+            "unemployment_rate": as_float(stats.get("unemployment_rate")),
+            "employment_share_pct": as_float(stats.get("employment_share_pct")),
+            "men_share_pct": as_float(stats.get("men_share_pct")),
+            "women_share_pct": as_float(stats.get("women_share_pct")),
+            "employees": as_int(stats.get("employees")),
+            "pay_hourly": as_float(stats.get("pay_hourly")),
+            "pay_weekly": as_float(stats.get("pay_weekly")),
+            "outlook_label": stats.get("outlook_label") or None,
+            "outlook_score": as_float(stats.get("outlook_score")),
+            "outlook_window_start": as_int(stats.get("outlook_window_start")),
+            "outlook_window_end": as_int(stats.get("outlook_window_end")),
+            "outlook_release_date": stats.get("outlook_release_date") or None,
+        }
+    return parsed
 
 
 def main():
@@ -95,6 +123,7 @@ def main():
                 "employment_url": row.get("employment_url", ""),
                 "wages_url": row.get("wages_url", ""),
                 "outlook_url": row.get("outlook_source_url", ""),
+                "stats_by_geo": parse_stats_by_geo(row.get("stats_by_geo_json", "")),
             }
         )
 
@@ -104,6 +133,8 @@ def main():
         "meta": {
             "title": "AI Exposure of the Canadian Job Market",
             "geography": "Canada",
+            "default_geography": DEFAULT_GEO_CODE,
+            "geographies": GEO_METADATA,
             "occupation_count": len(occupations),
             "jobs_year": jobs_year,
             "trend_from_year": trend_from_year,

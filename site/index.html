@@ -20,13 +20,19 @@ a{color:inherit}
 .view-toggle button,.category-chip{border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.02);color:var(--fg2);cursor:pointer;transition:background .15s ease,border-color .15s ease,color .15s ease,transform .15s ease}
 .view-toggle button{padding:7px 10px;border-radius:10px;font-size:10px;font-weight:600}.view-toggle button.active,.category-chip.active{color:var(--fg);background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.22)}
 .view-toggle button:hover:not(.active),.category-chip:hover:not(.active){background:rgba(255,255,255,.05);transform:translateY(-1px)}
+.select-wrap{display:block}
+.select-wrap select{width:100%;padding:10px 12px;border-radius:10px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.04);color:var(--fg);font:600 12px -apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;outline:none;appearance:none}
+.select-wrap select option{background:#10141c;color:var(--fg)}
 .chip-grid{display:flex;flex-wrap:wrap;gap:6px}.category-chip{display:inline-flex;align-items:center;gap:6px;padding:6px 9px;border-radius:999px;font-size:10px;font-weight:600;white-space:nowrap}.chip-metric{color:rgba(255,255,255,.5);font-weight:500}
 .histogram{display:flex;align-items:flex-end;gap:2px;height:52px}.histogram .bar{flex:1;min-height:2px;border-radius:2px 2px 0 0;box-shadow:inset 0 0 0 1px rgba(255,255,255,.04)}.hist-labels{display:flex;justify-content:space-between;font-size:9px;color:var(--fg2)}
 .tier-bar,.hbar-chart{display:flex;flex-direction:column;gap:5px}.tier-row,.hbar-row{display:flex;align-items:center;gap:6px;font-size:11px}.tier-color{width:10px;height:10px;border-radius:3px;flex-shrink:0}.tier-name{flex:1;color:var(--fg2)}.tier-pct{width:34px;text-align:right;color:var(--fg2);font-size:10px}
 .hbar-label{width:88px;flex-shrink:0;text-align:right;font-size:10px;color:var(--fg2)}.hbar-track{position:relative;flex:1;height:10px;border-radius:999px;overflow:hidden;background:rgba(255,255,255,.05)}.hbar-fill{height:100%;border-radius:999px}.hbar-val{width:28px;flex-shrink:0;text-align:right;font-size:10px}.hbar-row.active .hbar-label{color:var(--fg)}.hbar-row.active .hbar-track{box-shadow:inset 0 0 0 1px rgba(255,255,255,.18)}
+.chart-note{font-size:11px;line-height:1.5;color:var(--fg2);padding:2px 0}
 .gradient-legend{display:flex;align-items:center;gap:6px;margin-top:2px;font-size:10px;color:var(--fg2)}.gradient-legend canvas{border-radius:999px}
 canvas#canvas{display:block;position:fixed;top:0;left:var(--sidebar-w);cursor:default}
-#tooltip{position:fixed;pointer-events:none;max-width:380px;padding:12px 14px;border-radius:14px;background:rgba(15,18,24,.96);border:1px solid rgba(255,255,255,.14);box-shadow:0 18px 40px rgba(0,0,0,.42);opacity:0;transition:opacity .12s ease;z-index:30}#tooltip.visible{opacity:1}
+#emptyState{display:none;align-items:center;justify-content:center;padding:28px 34px;text-align:center;font-size:14px;line-height:1.6;color:var(--fg2);pointer-events:none;z-index:6}
+#emptyState.visible{display:flex}
+#tooltip{position:fixed;pointer-events:none;max-width:400px;padding:12px 14px;border-radius:14px;background:rgba(15,18,24,.96);border:1px solid rgba(255,255,255,.14);box-shadow:0 18px 40px rgba(0,0,0,.42);opacity:0;transition:opacity .12s ease;z-index:30}#tooltip.visible{opacity:1}
 #tooltip .tt-title{font-size:14px;font-weight:650;color:#fff;margin-bottom:4px}#tooltip .tt-subtitle{font-size:11px;color:var(--fg2);margin-bottom:8px}#tooltip .tt-exposure{font-size:12px;margin-bottom:8px}#tooltip .tt-stats{display:grid;grid-template-columns:auto auto;gap:3px 12px;font-size:12px}#tooltip .tt-stats .label{color:var(--fg2)}#tooltip .tt-stats .value{text-align:right;color:var(--fg)}#tooltip .tt-rationale{margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,.08);font-size:11px;line-height:1.45;color:var(--fg2)}
 @media (max-width:980px){body{overflow:auto}#sidebar{position:relative;width:100%;bottom:auto;padding:18px 16px;border-right:0;border-bottom:1px solid var(--line);box-shadow:none}.view-toggle{grid-template-columns:1fr}canvas#canvas{position:absolute;left:0;top:0}}
 @media (max-width:560px){#sidebar h1{font-size:16px}.stat-big{font-size:26px}.hbar-label{width:78px}#tooltip{max-width:calc(100vw - 20px)}}
@@ -35,9 +41,16 @@ canvas#canvas{display:block;position:fixed;top:0;left:var(--sidebar-w);cursor:de
 <body>
 <div id="sidebar">
   <div class="hero">
-    <div class="eyebrow">Canada / StatCan / ESDC</div>
+    <div class="eyebrow">Canada / Provinces / Territories</div>
     <h1>AI Exposure of the Canadian Job Market</h1>
     <div class="subtitle" id="subtitleMeta">Loading data...</div>
+  </div>
+  <div class="control-stack">
+    <div class="control-title">Geography</div>
+    <label class="select-wrap">
+      <select id="geographySelect" aria-label="Select geography"></select>
+    </label>
+    <div class="control-copy" id="geographyCopy">Labour-market metrics switch by geography. EPIAC stays national and only the employment weights change.</div>
   </div>
   <div class="control-stack">
     <div class="control-title">View</div>
@@ -60,6 +73,7 @@ canvas#canvas{display:block;position:fixed;top:0;left:var(--sidebar-w);cursor:de
   <div class="gradient-legend"><span id="legendStart">Low</span><canvas id="gradientLegend" width="80" height="8"></canvas><span id="legendEnd">High</span></div>
 </div>
 <canvas id="canvas"></canvas>
+<div id="emptyState"></div>
 <div id="tooltip"><div class="tt-title"></div><div class="tt-subtitle"></div><div class="tt-exposure"></div><div class="tt-stats"></div><div class="tt-rationale"></div></div>
 <script>
 function exposureColor(score){if(score==null)return[128,128,128];const t=Math.max(0,Math.min(10,score))/10;let r,g,b;if(t<.5){const s=t/.5;r=Math.round(50+s*180);g=Math.round(160-s*10);b=Math.round(50-s*20)}else{const s=(t-.5)/.5;r=Math.round(230+s*25);g=Math.round(150-s*110);b=Math.round(30-s*10)}return[r,g,b]}
@@ -69,42 +83,705 @@ function trendColorCSS(trend,alpha){if(trend==null)return`rgba(128,128,128,${alp
 function outlookColorCSS(score,alpha){if(score==null)return`rgba(128,128,128,${alpha})`;const c=Math.max(-2,Math.min(2,score));const n=(c+2)/4;let r,g,b;if(n<.5){const s=n/.5;r=Math.round(196+s*34);g=Math.round(66+s*118);b=Math.round(56-s*10)}else{const s=(n-.5)/.5;r=Math.round(230-s*56);g=Math.round(184+s*36);b=Math.round(46+s*20)}return`rgba(${r},${g},${b},${alpha})`}
 function squarify(items,x,y,w,h){if(!items.length||w<=0||h<=0)return[];if(items.length===1)return[{...items[0],rx:x,ry:y,rw:w,rh:h}];const total=items.reduce((s,i)=>s+i.value,0);if(!total)return[];const results=[];let remaining=[...items],cx=x,cy=y,cw=w,ch=h;while(remaining.length){const remTotal=remaining.reduce((s,i)=>s+i.value,0);const vertical=cw>=ch;const side=vertical?ch:cw;let row=[remaining[0]],rowSum=remaining[0].value;for(let i=1;i<remaining.length;i++){const candidate=[...row,remaining[i]],candidateSum=rowSum+remaining[i].value;if(worstAspect(candidate,candidateSum,side,remTotal,vertical?cw:ch)<worstAspect(row,rowSum,side,remTotal,vertical?cw:ch)){row=candidate;rowSum=candidateSum}else break}const rowFraction=rowSum/remTotal;const rowThickness=vertical?cw*rowFraction:ch*rowFraction;let offset=0;for(const item of row){const itemFraction=item.value/rowSum;const itemLength=side*itemFraction;if(vertical)results.push({...item,rx:cx,ry:cy+offset,rw:rowThickness,rh:itemLength});else results.push({...item,rx:cx+offset,ry:cy,rw:itemLength,rh:rowThickness});offset+=itemLength}if(vertical){cx+=rowThickness;cw-=rowThickness}else{cy+=rowThickness;ch-=rowThickness}remaining=remaining.slice(row.length)}return results}
 function worstAspect(row,rowSum,side,totalArea,extent){const rowExtent=extent*(rowSum/totalArea);if(!rowExtent)return Infinity;let worst=0;for(const item of row){const itemLen=side*(item.value/rowSum);if(!itemLen)continue;const aspect=Math.max(rowExtent/itemLen,itemLen/rowExtent);if(aspect>worst)worst=aspect}return worst}
-const VIEW_INFO={treemap:{colorLine:"color = StatCan EPIAC high-exposure share",copy:"Area tracks employment. In treemap view, color shows the share of workers in high-exposure EPIAC occupations. In the alternate views, columns stay ordered by that same official exposure share while color shows change or outlook.",legendStart:"0%",legendEnd:"100%"},trend:{colorLine:"color = employment change",copy:"Area tracks employment. Columns stay ordered by StatCan's EPIAC high-exposure share while color shows job growth or contraction since the StatCan baseline year.",legendStart:"Decline",legendEnd:"Growth"},outlook:{colorLine:"color = 2025-2027 outlook",copy:"Area tracks employment. Columns stay ordered by StatCan's EPIAC high-exposure share while color shows the province-aggregated ESDC outlook for 2025-2027.",legendStart:"Very limited",legendEnd:"Very good"}};
+
+const VIEW_INFO={
+  treemap:{colorLine:"color = StatCan EPIAC high-exposure share",copy:"Area tracks employment. In treemap view, color shows the share of workers in high-exposure EPIAC occupations. In the alternate views, columns stay ordered by that same official exposure share while color shows change or outlook.",legendStart:"0%",legendEnd:"100%"},
+  trend:{colorLine:"color = employment change",copy:"Area tracks employment. Columns stay ordered by StatCan's EPIAC high-exposure share while color shows job growth or contraction in the selected geography.",legendStart:"Decline",legendEnd:"Growth"},
+  outlook:{colorLine:"color = 2025-2027 outlook",copy:"Area tracks employment. Columns stay ordered by StatCan's EPIAC high-exposure share while color shows the selected geography's ESDC outlook.",legendStart:"Very limited",legendEnd:"Very good"}
+};
 const OUTLOOK_LABELS=["Very good","Good","Moderate","Limited","Very limited","Undetermined"];
 const OUTLOOK_LABEL_TO_SCORE={"Very good":2,"Good":1,"Moderate":0,"Limited":-1,"Very limited":-2};
 const categoryShort={"Management occupations":"Mgmt","Business, finance and administration occupations, except management":"Bus/Admin","Natural and applied sciences and related occupations, except management":"STEM","Health occupations, except management":"Health","Occupations in education, law and social, community and government services, except management":"Edu/Law","Occupations in art, culture, recreation and sport, except management":"Arts","Sales and service occupations, except management":"Sales","Trades, transport and equipment operators and related occupations, except management":"Trades","Natural resources, agriculture and related production occupations, except management":"Resources","Occupations in manufacturing and utilities, except management":"Mfg/Util"};
-const MOBILE_BREAKPOINT=980,MIN_CANVAS_HEIGHT=560,MARGIN=14,GAP=2,CATEGORY_HEADER=18;let meta={},allData=[],data=[],rects=[],trendRects=[],outlookRects=[],categoryRects=[],hovered=null,currentView="treemap",activeCategory="All",dpr=window.devicePixelRatio||1;const sidebar=document.getElementById("sidebar"),canvas=document.getElementById("canvas"),ctx=canvas.getContext("2d");
-function isMobileLayout(){return window.innerWidth<=MOBILE_BREAKPOINT}function escapeHTML(value){return String(value).replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;").replaceAll("'","&#39;")}function totalJobs(items){return items.reduce((s,item)=>s+(item.jobs||0),0)}function shortCategoryLabel(category){if(categoryShort[category])return categoryShort[category];return category.replace(", except management","").replace("occupations","").replace(/\s+/g," ").trim()}function formatCompact(value){if(value==null)return"-";if(value>=1e6)return(value/1e6).toFixed(1)+"M";if(value>=1e3)return Math.round(value/1e3)+"K";return value.toLocaleString()}function formatMoney(value){return value==null?"-":"$"+value.toFixed(2)}function formatPercent(value){return value==null?"-":value.toFixed(1)+"%"}function formatSignedPercent(value){return value==null?"-":(value>0?"+":"")+value.toFixed(1)+"%"}
+const MOBILE_BREAKPOINT=980,MIN_CANVAS_HEIGHT=560,MARGIN=14,GAP=2,CATEGORY_HEADER=18;
+
+let meta={},geoLookup={},sourceData=[],allData=[],data=[],rects=[],trendRects=[],outlookRects=[],categoryRects=[],hovered=null,currentView="treemap",activeCategory="All",selectedGeo="CA",dpr=window.devicePixelRatio||1;
+const sidebar=document.getElementById("sidebar"),canvas=document.getElementById("canvas"),ctx=canvas.getContext("2d");
+const emptyState=document.getElementById("emptyState");
+const geographySelect=document.getElementById("geographySelect");
+
+function isMobileLayout(){return window.innerWidth<=MOBILE_BREAKPOINT}
+function escapeHTML(value){return String(value).replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;").replaceAll("'","&#39;")}
+function totalJobs(items){return items.reduce((sum,item)=>sum+(item.jobs||0),0)}
+function shortCategoryLabel(category){if(categoryShort[category])return categoryShort[category];return category.replace(", except management","").replace("occupations","").replace(/\s+/g," ").trim()}
+function formatCompact(value){if(value==null)return"-";if(value>=1e6)return(value/1e6).toFixed(1)+"M";if(value>=1e3)return Math.round(value/1e3)+"K";return value.toLocaleString()}
+function formatMoney(value){return value==null?"-":"$"+value.toFixed(2)}
+function formatPercent(value){return value==null?"-":value.toFixed(1)+"%"}
+function formatSignedPercent(value){return value==null?"-":(value>0?"+":"")+value.toFixed(1)+"%"}
+function formatSharePair(men,women){if(men==null&&women==null)return"-";return`${men!=null?men.toFixed(1):"-"}% / ${women!=null?women.toFixed(1):"-"}%`}
 function fitText(text,maxWidth){if(maxWidth<=0)return"";if(ctx.measureText(text).width<=maxWidth)return text;let trimmed=text;while(trimmed.length&&ctx.measureText(trimmed+"...").width>maxWidth)trimmed=trimmed.slice(0,-1);return trimmed?trimmed+"...":""}
-function getCategoryGroups(source){const byCategory={};for(const item of source){if(!byCategory[item.category])byCategory[item.category]={category:item.category,jobs:0,weighted:0};byCategory[item.category].jobs+=item.jobs||0;if(item.exposure!=null&&item.jobs)byCategory[item.category].weighted+=item.exposure*item.jobs}return Object.values(byCategory).map(group=>({...group,label:shortCategoryLabel(group.category),avg:group.jobs>0?group.weighted/group.jobs:0})).sort((a,b)=>b.jobs-a.jobs)}
+function hasJobsData(items){return items.some(item=>item.jobs!=null)}
+function findMetricValue(items,key){for(const item of items){if(item[key]!=null)return item[key]}return null}
+function getGeoList(){return Array.isArray(meta.geographies)&&meta.geographies.length?meta.geographies:[{code:"CA",label_en:"Canada",label_fr:"Canada",type:"country"}]}
+function getGeoMeta(code){return geoLookup[code]||geoLookup[meta.default_geography]||{code:"CA",label_en:"Canada",label_fr:"Canada",type:"country"}}
+function getGeoLabel(code){return getGeoMeta(code).label_en||code}
+function getRenderableData(items){return items.filter(item=>(item.jobs||0)>0)}
+function renderNote(text){return`<div class="chart-note">${escapeHTML(text)}</div>`}
+
+function resolveOccupation(item,geoCode){
+  const stats=item.stats_by_geo&&item.stats_by_geo[geoCode]?item.stats_by_geo[geoCode]:{};
+  return{
+    ...item,
+    jobs:stats.jobs??null,
+    jobs_year:stats.jobs_year??null,
+    trend_pct:stats.trend_pct??null,
+    trend_from_year:stats.trend_from_year??null,
+    unemployment_rate:stats.unemployment_rate??null,
+    employment_share_pct:stats.employment_share_pct??null,
+    men_share_pct:stats.men_share_pct??null,
+    women_share_pct:stats.women_share_pct??null,
+    pay_hourly:stats.pay_hourly??null,
+    pay_weekly:stats.pay_weekly??null,
+    employees:stats.employees??null,
+    outlook_label:stats.outlook_label??null,
+    outlook_score:stats.outlook_score??null,
+    outlook_window_start:stats.outlook_window_start??null,
+    outlook_window_end:stats.outlook_window_end??null,
+    outlook_release_date:stats.outlook_release_date??null
+  };
+}
+
+function getCategoryGroups(source){
+  const byCategory={};
+  for(const item of source){
+    if(!byCategory[item.category])byCategory[item.category]={category:item.category,jobs:0,weighted:0};
+    byCategory[item.category].jobs+=item.jobs||0;
+    if(item.exposure!=null&&item.jobs)byCategory[item.category].weighted+=item.exposure*item.jobs;
+  }
+  return Object.values(byCategory).map(group=>({...group,label:shortCategoryLabel(group.category),avg:group.jobs>0?group.weighted/group.jobs:0})).sort((a,b)=>b.jobs-a.jobs||a.label.localeCompare(b.label));
+}
+
 function getFilteredData(){return activeCategory==="All"?[...allData]:allData.filter(item=>item.category===activeCategory)}
-function populateCategoryChips(){const root=document.getElementById("categoryChips");const options=[{category:"All",label:"All families",jobs:totalJobs(allData)},...getCategoryGroups(allData)];root.innerHTML=options.map(option=>`<button type="button" class="category-chip${option.category===activeCategory?" active":""}" data-category="${escapeHTML(option.category)}"><span>${escapeHTML(option.label)}</span><span class="chip-metric">${formatCompact(option.jobs)}</span></button>`).join("");root.querySelectorAll(".category-chip").forEach(button=>button.addEventListener("click",()=>setCategory(button.dataset.category||"All")))}
+
+function populateGeographySelect(){
+  const options=getGeoList();
+  geographySelect.innerHTML=options.map(geo=>`<option value="${escapeHTML(geo.code)}">${escapeHTML(geo.label_en)}</option>`).join("");
+  geographySelect.value=selectedGeo;
+}
+
+function populateCategoryChips(){
+  const root=document.getElementById("categoryChips");
+  const options=[{category:"All",label:"All families",jobs:totalJobs(allData)},...getCategoryGroups(allData)];
+  root.innerHTML=options.map(option=>`<button type="button" class="category-chip${option.category===activeCategory?" active":""}" data-category="${escapeHTML(option.category)}"><span>${escapeHTML(option.label)}</span><span class="chip-metric">${formatCompact(option.jobs)}</span></button>`).join("");
+  root.querySelectorAll(".category-chip").forEach(button=>button.addEventListener("click",()=>setCategory(button.dataset.category||"All")));
+}
+
 function getInitialView(){const params=new URLSearchParams(window.location.search);const requested=params.get("view");return requested&&VIEW_INFO[requested]?requested:"treemap"}
-function setCategory(category){activeCategory=category;data=getFilteredData();hovered=null;hideTooltip();populateCategoryChips();updateSubtitle();computeStats();resize()}
-function setView(view){currentView=view;const params=new URLSearchParams(window.location.search);if(view==="treemap")params.delete("view");else params.set("view",view);const nextSearch=params.toString();const nextUrl=`${window.location.pathname}${nextSearch?`?${nextSearch}`:""}${window.location.hash}`;window.history.replaceState(null,"",nextUrl);document.querySelectorAll("#viewToggle button").forEach(button=>button.classList.toggle("active",button.dataset.view===view));document.getElementById("viewCopy").textContent=VIEW_INFO[view].copy;hovered=null;hideTooltip();drawLegend();updateSubtitle();resize()}
-function getCanvasFrame(){if(isMobileLayout()){const sidebarHeight=Math.ceil(sidebar.getBoundingClientRect().height);return{x:0,y:sidebarHeight,width:window.innerWidth,height:Math.max(MIN_CANVAS_HEIGHT,window.innerHeight-Math.min(sidebarHeight,Math.floor(window.innerHeight*.55)))}}const sidebarWidth=Math.ceil(sidebar.getBoundingClientRect().width);return{x:sidebarWidth,y:0,width:Math.max(420,window.innerWidth-sidebarWidth),height:window.innerHeight}}
-function applyCanvasFrame(frame){canvas.style.position=isMobileLayout()?"absolute":"fixed";canvas.style.left=frame.x+"px";canvas.style.top=frame.y+"px";canvas.style.width=frame.width+"px";canvas.style.height=frame.height+"px";canvas.width=frame.width*dpr;canvas.height=frame.height*dpr;document.body.style.minHeight=isMobileLayout()?frame.y+frame.height+"px":"100vh";return frame}
-function layoutTreemap(){const frame=applyCanvasFrame(getCanvasFrame());const tx=MARGIN,ty=MARGIN,tw=frame.width-MARGIN*2,th=frame.height-MARGIN*2;categoryRects=[];rects=[];const groups=getCategoryGroups(data).map(group=>({category:group.category,label:group.label,value:group.jobs||1,items:data.filter(item=>item.category===group.category).sort((a,b)=>(b.jobs||0)-(a.jobs||0))}));for(const groupRect of squarify(groups,tx,ty,tw,th)){const headerHeight=groupRect.rh>66&&groupRect.rw>110?CATEGORY_HEADER:0;categoryRects.push({...groupRect,headerHeight});const innerX=groupRect.rx+GAP,innerY=groupRect.ry+GAP+headerHeight,innerW=groupRect.rw-GAP*2,innerH=groupRect.rh-GAP*2-headerHeight;if(innerW<=0||innerH<=0)continue;rects.push(...squarify(groupRect.items.map(item=>({...item,value:item.jobs||1})),innerX,innerY,innerW,innerH))}}
-function drawCategoryFrames(){for(const groupRect of categoryRects){ctx.fillStyle="rgba(255,255,255,.02)";ctx.fillRect(groupRect.rx,groupRect.ry,groupRect.rw,groupRect.rh);ctx.strokeStyle="rgba(255,255,255,.08)";ctx.lineWidth=1;ctx.strokeRect(groupRect.rx+.5,groupRect.ry+.5,groupRect.rw-1,groupRect.rh-1);if(groupRect.headerHeight>0){const gradient=ctx.createLinearGradient(groupRect.rx,groupRect.ry,groupRect.rx+groupRect.rw,groupRect.ry);gradient.addColorStop(0,"rgba(255,255,255,.09)");gradient.addColorStop(1,"rgba(255,255,255,.02)");ctx.fillStyle=gradient;ctx.fillRect(groupRect.rx+1,groupRect.ry+1,groupRect.rw-2,groupRect.headerHeight);ctx.font="600 10px -apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif";ctx.textBaseline="middle";ctx.textAlign="left";ctx.fillStyle="rgba(255,255,255,.62)";ctx.fillText(groupRect.label,groupRect.rx+6,groupRect.ry+groupRect.headerHeight/2+1);if(groupRect.rw>150){ctx.textAlign="right";ctx.fillText(formatCompact(groupRect.value),groupRect.rx+groupRect.rw-6,groupRect.ry+groupRect.headerHeight/2+1)}}}}
-function drawTreemap(){ctx.setTransform(dpr,0,0,dpr,0,0);ctx.fillStyle="#07090d";ctx.fillRect(0,0,canvas.width/dpr,canvas.height/dpr);drawCategoryFrames();for(const rect of rects){const isHovered=rect===hovered;const inset=GAP/2;const rx=rect.rx+inset,ry=rect.ry+inset,rw=rect.rw-inset*2,rh=rect.rh-inset*2;if(rw<=0||rh<=0)continue;ctx.fillStyle=exposureColorCSS(rect.exposure,isHovered ? .84 : .56);ctx.fillRect(rx,ry,rw,rh);ctx.strokeStyle=isHovered?"#fff":"rgba(255,255,255,.07)";ctx.lineWidth=isHovered?2:1;ctx.strokeRect(rx+.5,ry+.5,rw-1,rh-1);if(rw>58&&rh>20){ctx.save();ctx.beginPath();ctx.rect(rx+4,ry+3,rw-8,rh-6);ctx.clip();const fontSize=Math.min(13,Math.max(9,Math.min(rw/10,rh/3)));ctx.font=`600 ${fontSize}px -apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif`;ctx.textBaseline="top";ctx.textAlign="left";ctx.fillStyle=isHovered?"#fff":"rgba(255,255,255,.9)";ctx.fillText(fitText(rect.title,rw-10),rx+5,ry+5);if(rh>36&&rw>72){const info=`${rect.epiac_high_exposure_pct!=null?rect.epiac_high_exposure_pct.toFixed(0)+"% high-exp":"-"}  ${formatCompact(rect.jobs)} workers`;ctx.font=`500 ${Math.max(8,fontSize-2)}px -apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif`;ctx.fillStyle="rgba(255,255,255,.55)";ctx.fillText(fitText(info,rw-10),rx+5,ry+fontSize+7)}ctx.restore()}}}
-function layoutTrend(){const frame=applyCanvasFrame(getCanvasFrame());const pad={top:26,right:10,bottom:32,left:10};const plotW=frame.width-pad.left-pad.right,plotH=frame.height-pad.top-pad.bottom,colGap=3;const byExposure={};let jobsTotal=0;for(const item of data){if(item.exposure==null)continue;if(!byExposure[item.exposure])byExposure[item.exposure]=[];byExposure[item.exposure].push(item);jobsTotal+=item.jobs||0}const scores=Object.keys(byExposure).map(Number).sort((a,b)=>a-b);const colTotals=scores.map(score=>byExposure[score].reduce((sum,item)=>sum+(item.jobs||0),0));const totalGap=colGap*Math.max(0,scores.length-1);const availableW=plotW-totalGap;trendRects=[];let currentX=pad.left;for(let i=0;i<scores.length;i++){const score=scores[i],items=byExposure[score].slice().sort((a,b)=>(b.trend_pct||0)-(a.trend_pct||0)),colJobs=colTotals[i],colW=jobsTotal>0?(colJobs/jobsTotal)*availableW:0;let currentY=pad.top;for(const item of items){const itemH=colJobs>0?((item.jobs||0)/colJobs)*plotH:0;if(itemH<.5){currentY+=itemH;continue}trendRects.push({...item,rx:currentX,ry:currentY,rw:colW,rh:itemH});currentY+=itemH}currentX+=colW+colGap}trendRects._meta={pad,plotW,plotH,scores,colTotals,jobsTotal,availableW,colGap}}
-function drawTrend(){ctx.setTransform(dpr,0,0,dpr,0,0);ctx.fillStyle="#07090d";ctx.fillRect(0,0,canvas.width/dpr,canvas.height/dpr);const metaRect=trendRects._meta;if(!metaRect)return;ctx.textAlign="center";ctx.textBaseline="bottom";ctx.font="600 11px -apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif";let axisX=metaRect.pad.left;for(let i=0;i<metaRect.scores.length;i++){const colW=metaRect.jobsTotal>0?(metaRect.colTotals[i]/metaRect.jobsTotal)*metaRect.availableW:0;if(colW>14){ctx.fillStyle=exposureColorCSS(metaRect.scores[i],.72);ctx.fillText(metaRect.scores[i],axisX+colW/2,metaRect.pad.top-6)}axisX+=colW+metaRect.colGap}ctx.fillStyle="rgba(255,255,255,.42)";ctx.textBaseline="top";ctx.font="11px -apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif";ctx.fillText("High-exp. share",metaRect.pad.left+metaRect.availableW/2,metaRect.pad.top+metaRect.plotH+8);for(const rect of trendRects){const isHovered=rect===hovered;const rx=rect.rx+.5,ry=rect.ry+.5,rw=rect.rw-1,rh=rect.rh-1;if(rw<=0||rh<=0)continue;ctx.fillStyle=trendColorCSS(rect.trend_pct,isHovered ? .84 : .58);ctx.fillRect(rx,ry,rw,rh);ctx.strokeStyle=isHovered?"#fff":"rgba(255,255,255,.07)";ctx.lineWidth=isHovered?2:1;ctx.strokeRect(rx,ry,rw,rh);if(rw>42&&rh>16){ctx.save();ctx.beginPath();ctx.rect(rx+3,ry+2,rw-6,rh-4);ctx.clip();const fontSize=Math.min(12,Math.max(8,Math.min(rw/12,rh/2.5)));ctx.font=`600 ${fontSize}px -apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif`;ctx.textAlign="left";ctx.textBaseline="top";ctx.fillStyle=isHovered?"#fff":"rgba(255,255,255,.9)";ctx.fillText(fitText(rect.title,rw-8),rx+4,ry+3);if(rh>28&&rw>56){const info=`${formatSignedPercent(rect.trend_pct)}  ${formatCompact(rect.jobs)}`;ctx.font=`500 ${Math.max(7,fontSize-2)}px -apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif`;ctx.fillStyle="rgba(255,255,255,.55)";ctx.fillText(fitText(info,rw-8),rx+4,ry+fontSize+5)}ctx.restore()}}}
-function layoutOutlook(){const frame=applyCanvasFrame(getCanvasFrame());const pad={top:26,right:10,bottom:32,left:10};const plotW=frame.width-pad.left-pad.right,plotH=frame.height-pad.top-pad.bottom,colGap=3;const byExposure={};let jobsTotal=0;for(const item of data){if(item.exposure==null)continue;if(!byExposure[item.exposure])byExposure[item.exposure]=[];byExposure[item.exposure].push(item);jobsTotal+=item.jobs||0}const scores=Object.keys(byExposure).map(Number).sort((a,b)=>a-b);const colTotals=scores.map(score=>byExposure[score].reduce((sum,item)=>sum+(item.jobs||0),0));const totalGap=colGap*Math.max(0,scores.length-1);const availableW=plotW-totalGap;outlookRects=[];let currentX=pad.left;for(let i=0;i<scores.length;i++){const score=scores[i],items=byExposure[score].slice().sort((a,b)=>(b.outlook_score??-999)-(a.outlook_score??-999)),colJobs=colTotals[i],colW=jobsTotal>0?(colJobs/jobsTotal)*availableW:0;let currentY=pad.top;for(const item of items){const itemH=colJobs>0?((item.jobs||0)/colJobs)*plotH:0;if(itemH<.5){currentY+=itemH;continue}outlookRects.push({...item,rx:currentX,ry:currentY,rw:colW,rh:itemH});currentY+=itemH}currentX+=colW+colGap}outlookRects._meta={pad,plotW,plotH,scores,colTotals,jobsTotal,availableW,colGap}}
-function drawOutlook(){ctx.setTransform(dpr,0,0,dpr,0,0);ctx.fillStyle="#07090d";ctx.fillRect(0,0,canvas.width/dpr,canvas.height/dpr);const metaRect=outlookRects._meta;if(!metaRect)return;ctx.textAlign="center";ctx.textBaseline="bottom";ctx.font="600 11px -apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif";let axisX=metaRect.pad.left;for(let i=0;i<metaRect.scores.length;i++){const colW=metaRect.jobsTotal>0?(metaRect.colTotals[i]/metaRect.jobsTotal)*metaRect.availableW:0;if(colW>14){ctx.fillStyle=exposureColorCSS(metaRect.scores[i],.72);ctx.fillText(metaRect.scores[i],axisX+colW/2,metaRect.pad.top-6)}axisX+=colW+metaRect.colGap}ctx.fillStyle="rgba(255,255,255,.42)";ctx.textBaseline="top";ctx.font="11px -apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif";ctx.fillText("High-exp. share",metaRect.pad.left+metaRect.availableW/2,metaRect.pad.top+metaRect.plotH+8);for(const rect of outlookRects){const isHovered=rect===hovered;const rx=rect.rx+.5,ry=rect.ry+.5,rw=rect.rw-1,rh=rect.rh-1;if(rw<=0||rh<=0)continue;ctx.fillStyle=outlookColorCSS(rect.outlook_score,isHovered ? .84 : .58);ctx.fillRect(rx,ry,rw,rh);ctx.strokeStyle=isHovered?"#fff":"rgba(255,255,255,.07)";ctx.lineWidth=isHovered?2:1;ctx.strokeRect(rx,ry,rw,rh);if(rw>42&&rh>16){ctx.save();ctx.beginPath();ctx.rect(rx+3,ry+2,rw-6,rh-4);ctx.clip();const fontSize=Math.min(12,Math.max(8,Math.min(rw/12,rh/2.5)));ctx.font=`600 ${fontSize}px -apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif`;ctx.textAlign="left";ctx.textBaseline="top";ctx.fillStyle=isHovered?"#fff":"rgba(255,255,255,.9)";ctx.fillText(fitText(rect.title,rw-8),rx+4,ry+3);if(rh>28&&rw>56){const info=`${rect.outlook_label||"Undetermined"}  ${formatCompact(rect.jobs)}`;ctx.font=`500 ${Math.max(7,fontSize-2)}px -apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif`;ctx.fillStyle="rgba(255,255,255,.55)";ctx.fillText(fitText(info,rw-8),rx+4,ry+fontSize+5)}ctx.restore()}}}
-function getCanvasPoint(clientX,clientY){const bounds=canvas.getBoundingClientRect();return{x:clientX-bounds.left,y:clientY-bounds.top}}function hitTest(clientX,clientY,items){const point=getCanvasPoint(clientX,clientY);for(let i=items.length-1;i>=0;i--){const rect=items[i];if(point.x>=rect.rx&&point.x<rect.rx+rect.rw&&point.y>=rect.ry&&point.y<rect.ry+rect.rh)return rect}return null}function occupationDetailURL(item){if(!item||!item.slug)return null;return `occupation.html?slug=${encodeURIComponent(item.slug)}`}
-function showTooltip(item,clientX,clientY){const tt=document.getElementById("tooltip");tt.querySelector(".tt-title").textContent=item.title;tt.querySelector(".tt-subtitle").textContent=`${shortCategoryLabel(item.category)} family | NOC ${item.noc_code}`;if(item.epiac_high_exposure_pct!=null){const width=Math.max(0,Math.min(100,item.epiac_high_exposure_pct)),color=exposureColorCSS((item.epiac_high_exposure_pct||0)/10,1),groupColor=epiacGroupColorCSS(item.epiac_group_code,1);tt.querySelector(".tt-exposure").innerHTML=`<span style="color:${color};font-weight:700;">High-exposure share: ${item.epiac_high_exposure_pct.toFixed(1)}%</span><div style="margin-top:4px;height:4px;background:rgba(255,255,255,.08);border-radius:999px;"><div style="height:100%;width:${width}%;background:${color};border-radius:999px;"></div></div><div style="margin-top:6px;color:${groupColor};font-size:11px;">${item.epiac_group_label||"EPIAC group unavailable"}</div>`}else tt.querySelector(".tt-exposure").textContent="";const jobsYear=item.jobs_year||meta.jobs_year;const trendLabel=item.trend_from_year!=null&&jobsYear!=null?`${item.trend_from_year}-${jobsYear}`:"recent";const outlookWindow=item.outlook_window_start&&item.outlook_window_end?`${item.outlook_window_start}-${item.outlook_window_end}`:"2025-2027";tt.querySelector(".tt-stats").innerHTML=`<span class="label">Median hourly wage</span><span class="value">${formatMoney(item.pay_hourly)}</span><span class="label">Workers (${jobsYear||"-"})</span><span class="value">${formatCompact(item.jobs)}</span><span class="label">Employment change</span><span class="value">${formatSignedPercent(item.trend_pct)} (${trendLabel})</span><span class="label">Outlook (${outlookWindow})</span><span class="value">${item.outlook_label||"Undetermined"}</span><span class="label">AIOE (${item.epiac_reference_year||meta.exposure_reference_year||"2021"})</span><span class="value">${item.epiac_aioe!=null?item.epiac_aioe.toFixed(2):"-"}</span><span class="label">Complementarity</span><span class="value">${item.epiac_complementarity!=null?item.epiac_complementarity.toFixed(2):"-"}</span><span class="label">HELC / HEHC / Low</span><span class="value">${item.epiac_helc_pct!=null?item.epiac_helc_pct.toFixed(0):"-"} / ${item.epiac_hehc_pct!=null?item.epiac_hehc_pct.toFixed(0):"-"} / ${item.epiac_low_pct!=null?item.epiac_low_pct.toFixed(0):"-"}%</span><span class="label">Unemployment</span><span class="value">${formatPercent(item.unemployment_rate)}</span>`;tt.querySelector(".tt-rationale").textContent=item.exposure_rationale?`Mapping note: ${item.exposure_rationale}`:"";tt.classList.add("visible");tt.style.left="0px";tt.style.top="0px";const bounds=tt.getBoundingClientRect();const pad=14;let left=clientX+pad,top=clientY-pad;if(left+bounds.width>window.innerWidth-8)left=clientX-bounds.width-pad;if(top<8)top=clientY+pad;if(top+bounds.height>window.innerHeight-8)top=Math.max(8,clientY-bounds.height-pad);if(left<8)left=8;tt.style.left=left+"px";tt.style.top=top+"px"}
+function getInitialGeo(){const params=new URLSearchParams(window.location.search);const requested=(params.get("geo")||meta.default_geography||"CA").toUpperCase();return geoLookup[requested]?requested:(meta.default_geography||"CA")}
+
+function updateUrlState(){
+  const params=new URLSearchParams(window.location.search);
+  if(currentView==="treemap")params.delete("view");else params.set("view",currentView);
+  if(selectedGeo===(meta.default_geography||"CA"))params.delete("geo");else params.set("geo",selectedGeo);
+  const nextSearch=params.toString();
+  const nextUrl=`${window.location.pathname}${nextSearch?`?${nextSearch}`:""}${window.location.hash}`;
+  window.history.replaceState(null,"",nextUrl);
+}
+
+function updateViewCopy(){document.getElementById("viewCopy").textContent=VIEW_INFO[currentView].copy}
+
+function updateGeographyCopy(){
+  const geo=getGeoMeta(selectedGeo);
+  const hasGeoJobs=hasJobsData(allData);
+  const hasGeoOutlook=allData.some(item=>item.outlook_label!=null||item.outlook_score!=null);
+  let copy="";
+  if(selectedGeo===(meta.default_geography||"CA"))copy="Canada stays the default view. Labour-market metrics switch by geography, while StatCan EPIAC stays national and only the employment weights change.";
+  else if(hasGeoJobs)copy=`${geo.label_en} switches jobs, trend, unemployment, wages, and outlook. EPIAC remains the same national mapping; only the employment weights change.`;
+  else if(hasGeoOutlook)copy=`${geo.label_en} has ESDC outlook coverage, but the current StatCan occupation tables do not provide labour-market counts for this selector, so missing values stay unavailable.`;
+  else copy=`Current source tables do not provide labour-market coverage for ${geo.label_en}. Missing values stay unavailable rather than using Canada as a fallback.`;
+  document.getElementById("geographyCopy").textContent=copy;
+}
+
+function buildResolvedData(){allData=sourceData.map(item=>resolveOccupation(item,selectedGeo));data=getFilteredData()}
+
+function setCategory(category){
+  activeCategory=category;
+  data=getFilteredData();
+  hovered=null;
+  hideTooltip();
+  populateCategoryChips();
+  updateSubtitle();
+  computeStats();
+  resize();
+}
+
+function setView(view){
+  currentView=view;
+  updateUrlState();
+  document.querySelectorAll("#viewToggle button").forEach(button=>button.classList.toggle("active",button.dataset.view===view));
+  updateViewCopy();
+  hovered=null;
+  hideTooltip();
+  drawLegend();
+  updateSubtitle();
+  resize();
+}
+
+function setGeography(geoCode){
+  if(!geoLookup[geoCode])geoCode=meta.default_geography||"CA";
+  selectedGeo=geoCode;
+  buildResolvedData();
+  hovered=null;
+  hideTooltip();
+  updateUrlState();
+  populateGeographySelect();
+  populateCategoryChips();
+  updateViewCopy();
+  updateGeographyCopy();
+  updateSubtitle();
+  computeStats();
+  drawLegend();
+  resize();
+}
+
+function getCanvasFrame(){
+  if(isMobileLayout()){
+    const sidebarHeight=Math.ceil(sidebar.getBoundingClientRect().height);
+    return{x:0,y:sidebarHeight,width:window.innerWidth,height:Math.max(MIN_CANVAS_HEIGHT,window.innerHeight-Math.min(sidebarHeight,Math.floor(window.innerHeight*.55)))};
+  }
+  const sidebarWidth=Math.ceil(sidebar.getBoundingClientRect().width);
+  return{x:sidebarWidth,y:0,width:Math.max(420,window.innerWidth-sidebarWidth),height:window.innerHeight};
+}
+
+function applyCanvasFrame(frame){
+  canvas.style.position=isMobileLayout()?"absolute":"fixed";
+  canvas.style.left=frame.x+"px";
+  canvas.style.top=frame.y+"px";
+  canvas.style.width=frame.width+"px";
+  canvas.style.height=frame.height+"px";
+  canvas.width=frame.width*dpr;
+  canvas.height=frame.height*dpr;
+  emptyState.style.position=isMobileLayout()?"absolute":"fixed";
+  emptyState.style.left=frame.x+"px";
+  emptyState.style.top=frame.y+"px";
+  emptyState.style.width=frame.width+"px";
+  emptyState.style.height=frame.height+"px";
+  document.body.style.minHeight=isMobileLayout()?frame.y+frame.height+"px":"100vh";
+  return frame;
+}
+
+function layoutTreemap(){
+  const frame=applyCanvasFrame(getCanvasFrame());
+  const tx=MARGIN,ty=MARGIN,tw=frame.width-MARGIN*2,th=frame.height-MARGIN*2;
+  const renderable=getRenderableData(data);
+  categoryRects=[];
+  rects=[];
+  const groups=getCategoryGroups(renderable).filter(group=>group.jobs>0).map(group=>({category:group.category,label:group.label,value:group.jobs,items:renderable.filter(item=>item.category===group.category).sort((a,b)=>(b.jobs||0)-(a.jobs||0))}));
+  if(!groups.length)return;
+  for(const groupRect of squarify(groups,tx,ty,tw,th)){
+    const headerHeight=groupRect.rh>66&&groupRect.rw>110?CATEGORY_HEADER:0;
+    categoryRects.push({...groupRect,headerHeight});
+    const innerX=groupRect.rx+GAP,innerY=groupRect.ry+GAP+headerHeight,innerW=groupRect.rw-GAP*2,innerH=groupRect.rh-GAP*2-headerHeight;
+    if(innerW<=0||innerH<=0)continue;
+    rects.push(...squarify(groupRect.items.map(item=>({...item,value:item.jobs||1})),innerX,innerY,innerW,innerH));
+  }
+}
+
+function drawCategoryFrames(){
+  for(const groupRect of categoryRects){
+    ctx.fillStyle="rgba(255,255,255,.02)";
+    ctx.fillRect(groupRect.rx,groupRect.ry,groupRect.rw,groupRect.rh);
+    ctx.strokeStyle="rgba(255,255,255,.08)";
+    ctx.lineWidth=1;
+    ctx.strokeRect(groupRect.rx+.5,groupRect.ry+.5,groupRect.rw-1,groupRect.rh-1);
+    if(groupRect.headerHeight>0){
+      const gradient=ctx.createLinearGradient(groupRect.rx,groupRect.ry,groupRect.rx+groupRect.rw,groupRect.ry);
+      gradient.addColorStop(0,"rgba(255,255,255,.09)");
+      gradient.addColorStop(1,"rgba(255,255,255,.02)");
+      ctx.fillStyle=gradient;
+      ctx.fillRect(groupRect.rx+1,groupRect.ry+1,groupRect.rw-2,groupRect.headerHeight);
+      ctx.font="600 10px -apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif";
+      ctx.textBaseline="middle";
+      ctx.textAlign="left";
+      ctx.fillStyle="rgba(255,255,255,.62)";
+      ctx.fillText(groupRect.label,groupRect.rx+6,groupRect.ry+groupRect.headerHeight/2+1);
+      if(groupRect.rw>150){
+        ctx.textAlign="right";
+        ctx.fillText(formatCompact(groupRect.value),groupRect.rx+groupRect.rw-6,groupRect.ry+groupRect.headerHeight/2+1);
+      }
+    }
+  }
+}
+
+function drawTreemap(){
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.fillStyle="#07090d";
+  ctx.fillRect(0,0,canvas.width/dpr,canvas.height/dpr);
+  drawCategoryFrames();
+  for(const rect of rects){
+    const isHovered=rect===hovered;
+    const inset=GAP/2;
+    const rx=rect.rx+inset,ry=rect.ry+inset,rw=rect.rw-inset*2,rh=rect.rh-inset*2;
+    if(rw<=0||rh<=0)continue;
+    ctx.fillStyle=exposureColorCSS(rect.exposure,isHovered ? .84 : .56);
+    ctx.fillRect(rx,ry,rw,rh);
+    ctx.strokeStyle=isHovered?"#fff":"rgba(255,255,255,.07)";
+    ctx.lineWidth=isHovered?2:1;
+    ctx.strokeRect(rx+.5,ry+.5,rw-1,rh-1);
+    if(rw>58&&rh>20){
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(rx+4,ry+3,rw-8,rh-6);
+      ctx.clip();
+      const fontSize=Math.min(13,Math.max(9,Math.min(rw/10,rh/3)));
+      ctx.font=`600 ${fontSize}px -apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif`;
+      ctx.textBaseline="top";
+      ctx.textAlign="left";
+      ctx.fillStyle=isHovered?"#fff":"rgba(255,255,255,.9)";
+      ctx.fillText(fitText(rect.title,rw-10),rx+5,ry+5);
+      if(rh>36&&rw>72){
+        const info=`${rect.epiac_high_exposure_pct!=null?rect.epiac_high_exposure_pct.toFixed(0)+"% high-exp":"-"}  ${formatCompact(rect.jobs)} workers`;
+        ctx.font=`500 ${Math.max(8,fontSize-2)}px -apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif`;
+        ctx.fillStyle="rgba(255,255,255,.55)";
+        ctx.fillText(fitText(info,rw-10),rx+5,ry+fontSize+7);
+      }
+      ctx.restore();
+    }
+  }
+}
+
+function layoutTrend(){
+  const frame=applyCanvasFrame(getCanvasFrame());
+  const pad={top:26,right:10,bottom:32,left:10};
+  const plotW=frame.width-pad.left-pad.right,plotH=frame.height-pad.top-pad.bottom,colGap=3;
+  const byExposure={};
+  let jobsTotal=0;
+  for(const item of getRenderableData(data)){
+    if(item.exposure==null)continue;
+    if(!byExposure[item.exposure])byExposure[item.exposure]=[];
+    byExposure[item.exposure].push(item);
+    jobsTotal+=item.jobs||0;
+  }
+  const scores=Object.keys(byExposure).map(Number).sort((a,b)=>a-b);
+  const colTotals=scores.map(score=>byExposure[score].reduce((sum,item)=>sum+(item.jobs||0),0));
+  const totalGap=colGap*Math.max(0,scores.length-1);
+  const availableW=plotW-totalGap;
+  trendRects=[];
+  let currentX=pad.left;
+  for(let i=0;i<scores.length;i++){
+    const score=scores[i],items=byExposure[score].slice().sort((a,b)=>(b.trend_pct??-999)-(a.trend_pct??-999)),colJobs=colTotals[i],colW=jobsTotal>0?(colJobs/jobsTotal)*availableW:0;
+    let currentY=pad.top;
+    for(const item of items){
+      const itemH=colJobs>0?((item.jobs||0)/colJobs)*plotH:0;
+      if(itemH<.5){currentY+=itemH;continue}
+      trendRects.push({...item,rx:currentX,ry:currentY,rw:colW,rh:itemH});
+      currentY+=itemH;
+    }
+    currentX+=colW+colGap;
+  }
+  trendRects._meta={pad,plotW,plotH,scores,colTotals,jobsTotal,availableW,colGap};
+}
+
+function drawTrend(){
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.fillStyle="#07090d";
+  ctx.fillRect(0,0,canvas.width/dpr,canvas.height/dpr);
+  const metaRect=trendRects._meta;
+  if(!metaRect)return;
+  ctx.textAlign="center";
+  ctx.textBaseline="bottom";
+  ctx.font="600 11px -apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif";
+  let axisX=metaRect.pad.left;
+  for(let i=0;i<metaRect.scores.length;i++){
+    const colW=metaRect.jobsTotal>0?(metaRect.colTotals[i]/metaRect.jobsTotal)*metaRect.availableW:0;
+    if(colW>14){
+      ctx.fillStyle=exposureColorCSS(metaRect.scores[i],.72);
+      ctx.fillText(metaRect.scores[i],axisX+colW/2,metaRect.pad.top-6);
+    }
+    axisX+=colW+metaRect.colGap;
+  }
+  ctx.fillStyle="rgba(255,255,255,.42)";
+  ctx.textBaseline="top";
+  ctx.font="11px -apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif";
+  ctx.fillText("High-exp. share",metaRect.pad.left+metaRect.availableW/2,metaRect.pad.top+metaRect.plotH+8);
+  for(const rect of trendRects){
+    const isHovered=rect===hovered;
+    const rx=rect.rx+.5,ry=rect.ry+.5,rw=rect.rw-1,rh=rect.rh-1;
+    if(rw<=0||rh<=0)continue;
+    ctx.fillStyle=trendColorCSS(rect.trend_pct,isHovered ? .84 : .58);
+    ctx.fillRect(rx,ry,rw,rh);
+    ctx.strokeStyle=isHovered?"#fff":"rgba(255,255,255,.07)";
+    ctx.lineWidth=isHovered?2:1;
+    ctx.strokeRect(rx,ry,rw,rh);
+    if(rw>42&&rh>16){
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(rx+3,ry+2,rw-6,rh-4);
+      ctx.clip();
+      const fontSize=Math.min(12,Math.max(8,Math.min(rw/12,rh/2.5)));
+      ctx.font=`600 ${fontSize}px -apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif`;
+      ctx.textAlign="left";
+      ctx.textBaseline="top";
+      ctx.fillStyle=isHovered?"#fff":"rgba(255,255,255,.9)";
+      ctx.fillText(fitText(rect.title,rw-8),rx+4,ry+3);
+      if(rh>28&&rw>56){
+        const info=`${formatSignedPercent(rect.trend_pct)}  ${formatCompact(rect.jobs)}`;
+        ctx.font=`500 ${Math.max(7,fontSize-2)}px -apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif`;
+        ctx.fillStyle="rgba(255,255,255,.55)";
+        ctx.fillText(fitText(info,rw-8),rx+4,ry+fontSize+5);
+      }
+      ctx.restore();
+    }
+  }
+}
+
+function layoutOutlook(){
+  const frame=applyCanvasFrame(getCanvasFrame());
+  const pad={top:26,right:10,bottom:32,left:10};
+  const plotW=frame.width-pad.left-pad.right,plotH=frame.height-pad.top-pad.bottom,colGap=3;
+  const byExposure={};
+  let jobsTotal=0;
+  for(const item of getRenderableData(data)){
+    if(item.exposure==null)continue;
+    if(!byExposure[item.exposure])byExposure[item.exposure]=[];
+    byExposure[item.exposure].push(item);
+    jobsTotal+=item.jobs||0;
+  }
+  const scores=Object.keys(byExposure).map(Number).sort((a,b)=>a-b);
+  const colTotals=scores.map(score=>byExposure[score].reduce((sum,item)=>sum+(item.jobs||0),0));
+  const totalGap=colGap*Math.max(0,scores.length-1);
+  const availableW=plotW-totalGap;
+  outlookRects=[];
+  let currentX=pad.left;
+  for(let i=0;i<scores.length;i++){
+    const score=scores[i],items=byExposure[score].slice().sort((a,b)=>(b.outlook_score??-999)-(a.outlook_score??-999)),colJobs=colTotals[i],colW=jobsTotal>0?(colJobs/jobsTotal)*availableW:0;
+    let currentY=pad.top;
+    for(const item of items){
+      const itemH=colJobs>0?((item.jobs||0)/colJobs)*plotH:0;
+      if(itemH<.5){currentY+=itemH;continue}
+      outlookRects.push({...item,rx:currentX,ry:currentY,rw:colW,rh:itemH});
+      currentY+=itemH;
+    }
+    currentX+=colW+colGap;
+  }
+  outlookRects._meta={pad,plotW,plotH,scores,colTotals,jobsTotal,availableW,colGap};
+}
+
+function drawOutlook(){
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.fillStyle="#07090d";
+  ctx.fillRect(0,0,canvas.width/dpr,canvas.height/dpr);
+  const metaRect=outlookRects._meta;
+  if(!metaRect)return;
+  ctx.textAlign="center";
+  ctx.textBaseline="bottom";
+  ctx.font="600 11px -apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif";
+  let axisX=metaRect.pad.left;
+  for(let i=0;i<metaRect.scores.length;i++){
+    const colW=metaRect.jobsTotal>0?(metaRect.colTotals[i]/metaRect.jobsTotal)*metaRect.availableW:0;
+    if(colW>14){
+      ctx.fillStyle=exposureColorCSS(metaRect.scores[i],.72);
+      ctx.fillText(metaRect.scores[i],axisX+colW/2,metaRect.pad.top-6);
+    }
+    axisX+=colW+metaRect.colGap;
+  }
+  ctx.fillStyle="rgba(255,255,255,.42)";
+  ctx.textBaseline="top";
+  ctx.font="11px -apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif";
+  ctx.fillText("High-exp. share",metaRect.pad.left+metaRect.availableW/2,metaRect.pad.top+metaRect.plotH+8);
+  for(const rect of outlookRects){
+    const isHovered=rect===hovered;
+    const rx=rect.rx+.5,ry=rect.ry+.5,rw=rect.rw-1,rh=rect.rh-1;
+    if(rw<=0||rh<=0)continue;
+    ctx.fillStyle=outlookColorCSS(rect.outlook_score,isHovered ? .84 : .58);
+    ctx.fillRect(rx,ry,rw,rh);
+    ctx.strokeStyle=isHovered?"#fff":"rgba(255,255,255,.07)";
+    ctx.lineWidth=isHovered?2:1;
+    ctx.strokeRect(rx,ry,rw,rh);
+    if(rw>42&&rh>16){
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(rx+3,ry+2,rw-6,rh-4);
+      ctx.clip();
+      const fontSize=Math.min(12,Math.max(8,Math.min(rw/12,rh/2.5)));
+      ctx.font=`600 ${fontSize}px -apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif`;
+      ctx.textAlign="left";
+      ctx.textBaseline="top";
+      ctx.fillStyle=isHovered?"#fff":"rgba(255,255,255,.9)";
+      ctx.fillText(fitText(rect.title,rw-8),rx+4,ry+3);
+      if(rh>28&&rw>56){
+        const info=`${rect.outlook_label||"Undetermined"}  ${formatCompact(rect.jobs)}`;
+        ctx.font=`500 ${Math.max(7,fontSize-2)}px -apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif`;
+        ctx.fillStyle="rgba(255,255,255,.55)";
+        ctx.fillText(fitText(info,rw-8),rx+4,ry+fontSize+5);
+      }
+      ctx.restore();
+    }
+  }
+}
+
+function getCanvasPoint(clientX,clientY){const bounds=canvas.getBoundingClientRect();return{x:clientX-bounds.left,y:clientY-bounds.top}}
+function hitTest(clientX,clientY,items){const point=getCanvasPoint(clientX,clientY);for(let i=items.length-1;i>=0;i--){const rect=items[i];if(point.x>=rect.rx&&point.x<rect.rx+rect.rw&&point.y>=rect.ry&&point.y<rect.ry+rect.rh)return rect}return null}
+
+function occupationDetailURL(item){
+  if(!item||!item.slug)return null;
+  const params=new URLSearchParams({slug:item.slug});
+  if(selectedGeo!==(meta.default_geography||"CA"))params.set("geo",selectedGeo);
+  return`occupation.html?${params.toString()}`;
+}
+
+function showTooltip(item,clientX,clientY){
+  const tt=document.getElementById("tooltip");
+  const geoLabel=getGeoLabel(selectedGeo);
+  const jobsYear=item.jobs_year??findMetricValue(allData,"jobs_year");
+  const trendLabel=item.trend_from_year!=null&&jobsYear!=null?`${item.trend_from_year}-${jobsYear}`:"recent";
+  const outlookStart=item.outlook_window_start??findMetricValue(allData,"outlook_window_start")??meta.outlook_window_start??2025;
+  const outlookEnd=item.outlook_window_end??findMetricValue(allData,"outlook_window_end")??meta.outlook_window_end??2027;
+  tt.querySelector(".tt-title").textContent=item.title;
+  tt.querySelector(".tt-subtitle").textContent=`${shortCategoryLabel(item.category)} family | NOC ${item.noc_code} | ${geoLabel}`;
+  if(item.epiac_high_exposure_pct!=null){
+    const width=Math.max(0,Math.min(100,item.epiac_high_exposure_pct));
+    const color=exposureColorCSS((item.epiac_high_exposure_pct||0)/10,1);
+    const groupColor=epiacGroupColorCSS(item.epiac_group_code,1);
+    tt.querySelector(".tt-exposure").innerHTML=`<span style="color:${color};font-weight:700;">High-exposure share: ${item.epiac_high_exposure_pct.toFixed(1)}%</span><div style="margin-top:4px;height:4px;background:rgba(255,255,255,.08);border-radius:999px;"><div style="height:100%;width:${width}%;background:${color};border-radius:999px;"></div></div><div style="margin-top:6px;color:${groupColor};font-size:11px;">${item.epiac_group_label||"EPIAC group unavailable"}</div>`;
+  }else{
+    tt.querySelector(".tt-exposure").textContent="";
+  }
+  tt.querySelector(".tt-stats").innerHTML=`<span class="label">Median hourly wage</span><span class="value">${formatMoney(item.pay_hourly)}</span><span class="label">Workers (${jobsYear||"-"})</span><span class="value">${formatCompact(item.jobs)}</span><span class="label">Paid employees</span><span class="value">${formatCompact(item.employees)}</span><span class="label">Employment share</span><span class="value">${formatPercent(item.employment_share_pct)}</span><span class="label">Employment change</span><span class="value">${formatSignedPercent(item.trend_pct)} (${trendLabel})</span><span class="label">Outlook (${outlookStart}-${outlookEnd})</span><span class="value">${item.outlook_label||"Undetermined"}</span><span class="label">Men / Women share</span><span class="value">${formatSharePair(item.men_share_pct,item.women_share_pct)}</span><span class="label">AIOE (${item.epiac_reference_year||meta.exposure_reference_year||"2021"})</span><span class="value">${item.epiac_aioe!=null?item.epiac_aioe.toFixed(2):"-"}</span><span class="label">Complementarity</span><span class="value">${item.epiac_complementarity!=null?item.epiac_complementarity.toFixed(2):"-"}</span><span class="label">HELC / HEHC / Low</span><span class="value">${item.epiac_helc_pct!=null?item.epiac_helc_pct.toFixed(0):"-"} / ${item.epiac_hehc_pct!=null?item.epiac_hehc_pct.toFixed(0):"-"} / ${item.epiac_low_pct!=null?item.epiac_low_pct.toFixed(0):"-"}%</span><span class="label">Unemployment</span><span class="value">${formatPercent(item.unemployment_rate)}</span>`;
+  tt.querySelector(".tt-rationale").textContent=item.exposure_rationale?`Mapping note: ${item.exposure_rationale}`:"";
+  tt.classList.add("visible");
+  tt.style.left="0px";
+  tt.style.top="0px";
+  const bounds=tt.getBoundingClientRect();
+  const pad=14;
+  let left=clientX+pad,top=clientY-pad;
+  if(left+bounds.width>window.innerWidth-8)left=clientX-bounds.width-pad;
+  if(top<8)top=clientY+pad;
+  if(top+bounds.height>window.innerHeight-8)top=Math.max(8,clientY-bounds.height-pad);
+  if(left<8)left=8;
+  tt.style.left=left+"px";
+  tt.style.top=top+"px";
+}
+
 function hideTooltip(){document.getElementById("tooltip").classList.remove("visible")}
-function computeStats(){const visibleJobs=totalJobs(data),nationalJobs=totalJobs(allData),jobsYear=meta.jobs_year||(data[0]?data[0].jobs_year:null),trendFromYear=meta.trend_from_year||(data[0]?data[0].trend_from_year:null);let weightedHighShareSum=0,weightedCount=0;for(const item of data){if(item.epiac_high_exposure_pct!=null&&item.jobs){weightedHighShareSum+=item.epiac_high_exposure_pct*item.jobs;weightedCount+=item.jobs}}const weightedHighShare=weightedCount>0?weightedHighShareSum/weightedCount:0;const histogram=new Array(11).fill(0);for(const item of data){if(item.exposure!=null&&item.jobs)histogram[item.exposure]+=item.jobs}const groupRows=[{code:"HELC",name:"High exp / low comp",jobs:data.reduce((sum,item)=>sum+((item.jobs||0)*((item.epiac_helc_pct||0)/100)),0),color:epiacGroupColorCSS("HELC",.95)},{code:"HEHC",name:"High exp / high comp",jobs:data.reduce((sum,item)=>sum+((item.jobs||0)*((item.epiac_hehc_pct||0)/100)),0),color:epiacGroupColorCSS("HEHC",.95)},{code:"LOW",name:"Low exposure",jobs:data.reduce((sum,item)=>sum+((item.jobs||0)*((item.epiac_low_pct||0)/100)),0),color:epiacGroupColorCSS("LOW",.95)}];for(const row of groupRows)row.pct=visibleJobs>0?row.jobs/visibleJobs*100:0;const maxHist=Math.max(...histogram,0);document.getElementById("statTotalJobs").textContent=formatCompact(visibleJobs);document.getElementById("statTotalJobsDesc").textContent=activeCategory==="All"?(jobsYear?`All families in Canada, ${jobsYear}`:"All families in Canada"):`${shortCategoryLabel(activeCategory)} family, ${nationalJobs>0?(visibleJobs/nationalJobs*100).toFixed(1):"0.0"}% of Canada`;document.getElementById("statAvgExposure").innerHTML=`<span style="color:${exposureColorCSS(weightedHighShare/10,1)}">${weightedHighShare.toFixed(0)}%</span>`;document.getElementById("histogram").innerHTML=histogram.map((count,score)=>`<div class="bar" style="height:${Math.max(2,maxHist>0?count/maxHist*100:0)}%;background:${exposureColorCSS(score,.78)}" title="${score*10}%: ${formatCompact(count)} workers"></div>`).join("");document.getElementById("tierBar").innerHTML=groupRows.map(row=>`<div class="tier-row"><div class="tier-color" style="background:${row.color}"></div><span class="tier-name">${row.name}</span><span class="tier-jobs">${formatCompact(Math.round(row.jobs))}</span><span class="tier-pct">${row.pct.toFixed(0)}%</span></div>`).join("");const payBands=[{label:"<$20",min:0,max:20},{label:"$20-30",min:20,max:30},{label:"$30-40",min:30,max:40},{label:"$40-50",min:40,max:50},{label:"$50+",min:50,max:Infinity}];document.getElementById("payChart").innerHTML=payBands.map(band=>{let shareSum=0,jobsSum=0;for(const item of data){if(item.epiac_high_exposure_pct!=null&&item.jobs&&item.pay_hourly!=null&&item.pay_hourly>=band.min&&item.pay_hourly<band.max){shareSum+=item.epiac_high_exposure_pct*item.jobs;jobsSum+=item.jobs}}const avg=jobsSum>0?shareSum/jobsSum:0;return`<div class="hbar-row"><span class="hbar-label">${band.label}</span><div class="hbar-track"><div class="hbar-fill" style="width:${avg}%;background:${exposureColorCSS(avg/10,.82)}"></div></div><span class="hbar-val">${avg.toFixed(0)}%</span></div>`}).join("");document.getElementById("familyChart").innerHTML=getCategoryGroups(allData).map(group=>{let shareSum=0,jobsSum=0;for(const item of allData){if(item.category===group.category&&item.epiac_high_exposure_pct!=null&&item.jobs){shareSum+=item.epiac_high_exposure_pct*item.jobs;jobsSum+=item.jobs}}const avg=jobsSum>0?shareSum/jobsSum:0;return`<div class="hbar-row${activeCategory!=="All"&&group.category===activeCategory?" active":""}"><span class="hbar-label">${escapeHTML(group.label)}</span><div class="hbar-track"><div class="hbar-fill" style="width:${avg}%;background:${exposureColorCSS(avg/10,.82)}"></div></div><span class="hbar-val">${avg.toFixed(0)}%</span></div>`}).join("");const highExposureWorkers=data.reduce((sum,item)=>sum+((item.jobs||0)*((item.epiac_high_exposure_pct||0)/100)),0);const highExposurePct=visibleJobs>0?highExposureWorkers/visibleJobs*100:0;document.getElementById("statHighExposure").textContent=formatCompact(Math.round(highExposureWorkers));document.getElementById("statHighExposureDesc").textContent=`${highExposurePct.toFixed(0)}% of visible workers are mapped to high-exposure EPIAC occupations${trendFromYear&&jobsYear?`  |  trend view uses ${trendFromYear}-${jobsYear}`:""}`;document.getElementById("outlookMix").innerHTML=OUTLOOK_LABELS.map(label=>{const jobs=data.reduce((sum,item)=>sum+((item.outlook_label||"Undetermined")===label?(item.jobs||0):0),0);const pct=visibleJobs>0?jobs/visibleJobs*100:0;const score=OUTLOOK_LABEL_TO_SCORE[label];const color=label==="Undetermined"?"rgba(140,140,140,.9)":outlookColorCSS(score,.9);return`<div class="tier-row"><div class="tier-color" style="background:${color}"></div><span class="tier-name">${label}</span><span class="tier-jobs">${formatCompact(jobs)}</span><span class="tier-pct">${pct.toFixed(0)}%</span></div>`}).join("")}
-function drawLegend(){const legend=document.getElementById("gradientLegend"),gctx=legend.getContext("2d");document.getElementById("legendStart").textContent=VIEW_INFO[currentView].legendStart;document.getElementById("legendEnd").textContent=VIEW_INFO[currentView].legendEnd;for(let x=0;x<legend.width;x++){const t=x/(legend.width-1);if(currentView==="treemap")gctx.fillStyle=exposureColorCSS(t*10,1);else if(currentView==="trend")gctx.fillStyle=trendColorCSS(-25+t*50,1);else gctx.fillStyle=outlookColorCSS(-2+t*4,1);gctx.fillRect(x,0,1,legend.height)}}
-function updateSubtitle(){const subtitle=document.getElementById("subtitleMeta"),jobsYear=meta.jobs_year||(data[0]?data[0].jobs_year:""),trendFromYear=meta.trend_from_year||(data[0]?data[0].trend_from_year:""),outlookStart=meta.outlook_window_start||(data[0]?data[0].outlook_window_start:"2025"),outlookEnd=meta.outlook_window_end||(data[0]?data[0].outlook_window_end:"2027"),exposureYear=meta.exposure_reference_year||(data[0]?data[0].epiac_reference_year:"2021"),visibleCount=data.length,totalCount=meta.occupation_count||allData.length||visibleCount,filterLabel=activeCategory==="All"?"All families":shortCategoryLabel(activeCategory),viewInfo=VIEW_INFO[currentView];subtitle.innerHTML=`${visibleCount} of ${totalCount} NOC occupation groups shown | area = employment | ${viewInfo.colorLine}<br>Filter: ${escapeHTML(filterLabel)} | Canada, ${jobsYear} annual data from <a href="https://www150.statcan.gc.ca/t1/tbl1/en/tv.action?pid=1410041601" target="_blank" rel="noopener">StatCan</a><br>Exposure uses mapped StatCan EPIAC estimates from ${exposureYear} Census occupations | outlook uses ESDC ${outlookStart}-${outlookEnd} | <a href="https://karpathy.ai/jobs/" target="_blank" rel="noopener">upstream inspiration</a>`}
-function redraw(){if(currentView==="treemap"){layoutTreemap();drawTreemap()}else if(currentView==="trend"){layoutTrend();drawTrend()}else{layoutOutlook();drawOutlook()}}function resize(){dpr=window.devicePixelRatio||1;redraw()}
+
+function renderHistogram(values){
+  const histogram=document.getElementById("histogram");
+  const maxHist=Math.max(...values,0);
+  histogram.innerHTML=values.map((count,score)=>`<div class="bar" style="height:${Math.max(2,maxHist>0?count/maxHist*100:2)}%;background:${exposureColorCSS(score,maxHist>0 ? .78 : .18)}" title="${score*10}%: ${formatCompact(count)} workers"></div>`).join("");
+}
+
+function renderTierBar(items){
+  const target=document.getElementById("tierBar");
+  if(!hasJobsData(items)){target.innerHTML=renderNote("Unavailable for the current selection.");return}
+  const visibleJobs=totalJobs(items);
+  const rows=[
+    {code:"HELC",name:"High exp / low comp",jobs:items.reduce((sum,item)=>sum+((item.jobs||0)*((item.epiac_helc_pct||0)/100)),0),color:epiacGroupColorCSS("HELC",.95)},
+    {code:"HEHC",name:"High exp / high comp",jobs:items.reduce((sum,item)=>sum+((item.jobs||0)*((item.epiac_hehc_pct||0)/100)),0),color:epiacGroupColorCSS("HEHC",.95)},
+    {code:"LOW",name:"Low exposure",jobs:items.reduce((sum,item)=>sum+((item.jobs||0)*((item.epiac_low_pct||0)/100)),0),color:epiacGroupColorCSS("LOW",.95)}
+  ];
+  rows.forEach(row=>row.pct=visibleJobs>0?row.jobs/visibleJobs*100:0);
+  target.innerHTML=rows.map(row=>`<div class="tier-row"><div class="tier-color" style="background:${row.color}"></div><span class="tier-name">${row.name}</span><span class="tier-jobs">${formatCompact(Math.round(row.jobs))}</span><span class="tier-pct">${row.pct.toFixed(0)}%</span></div>`).join("");
+}
+
+function renderPayChart(items){
+  const target=document.getElementById("payChart");
+  if(!hasJobsData(items)){target.innerHTML=renderNote("Unavailable for the current selection.");return}
+  const payBands=[{label:"<$20",min:0,max:20},{label:"$20-30",min:20,max:30},{label:"$30-40",min:30,max:40},{label:"$40-50",min:40,max:50},{label:"$50+",min:50,max:Infinity}];
+  target.innerHTML=payBands.map(band=>{
+    let shareSum=0,jobsSum=0;
+    for(const item of items){
+      if(item.epiac_high_exposure_pct!=null&&item.jobs&&item.pay_hourly!=null&&item.pay_hourly>=band.min&&item.pay_hourly<band.max){
+        shareSum+=item.epiac_high_exposure_pct*item.jobs;
+        jobsSum+=item.jobs;
+      }
+    }
+    const avg=jobsSum>0?shareSum/jobsSum:0;
+    return`<div class="hbar-row"><span class="hbar-label">${band.label}</span><div class="hbar-track"><div class="hbar-fill" style="width:${avg}%;background:${exposureColorCSS(avg/10,.82)}"></div></div><span class="hbar-val">${jobsSum>0?avg.toFixed(0)+"%":"-"}</span></div>`;
+  }).join("");
+}
+
+function renderFamilyChart(){
+  const target=document.getElementById("familyChart");
+  if(!hasJobsData(allData)){target.innerHTML=renderNote("Unavailable for the current geography.");return}
+  target.innerHTML=getCategoryGroups(allData).map(group=>{
+    let shareSum=0,jobsSum=0;
+    for(const item of allData){
+      if(item.category===group.category&&item.epiac_high_exposure_pct!=null&&item.jobs){
+        shareSum+=item.epiac_high_exposure_pct*item.jobs;
+        jobsSum+=item.jobs;
+      }
+    }
+    const avg=jobsSum>0?shareSum/jobsSum:0;
+    return`<div class="hbar-row${activeCategory!=="All"&&group.category===activeCategory?" active":""}"><span class="hbar-label">${escapeHTML(group.label)}</span><div class="hbar-track"><div class="hbar-fill" style="width:${avg}%;background:${exposureColorCSS(avg/10,.82)}"></div></div><span class="hbar-val">${jobsSum>0?avg.toFixed(0)+"%":"-"}</span></div>`;
+  }).join("");
+}
+
+function renderOutlookMix(items){
+  const target=document.getElementById("outlookMix");
+  if(!hasJobsData(items)){target.innerHTML=renderNote("Unavailable for the current selection.");return}
+  const visibleJobs=totalJobs(items);
+  target.innerHTML=OUTLOOK_LABELS.map(label=>{
+    const jobs=items.reduce((sum,item)=>sum+((item.outlook_label||"Undetermined")===label?(item.jobs||0):0),0);
+    const pct=visibleJobs>0?jobs/visibleJobs*100:0;
+    const score=OUTLOOK_LABEL_TO_SCORE[label];
+    const color=label==="Undetermined"?"rgba(140,140,140,.9)":outlookColorCSS(score,.9);
+    return`<div class="tier-row"><div class="tier-color" style="background:${color}"></div><span class="tier-name">${label}</span><span class="tier-jobs">${formatCompact(jobs)}</span><span class="tier-pct">${visibleJobs>0?pct.toFixed(0)+"%":"-"}</span></div>`;
+  }).join("");
+}
+
+function computeStats(){
+  const geoLabel=getGeoLabel(selectedGeo);
+  const visibleJobs=totalJobs(data);
+  const geoJobs=totalJobs(allData);
+  const jobsYear=findMetricValue(allData,"jobs_year")??(selectedGeo===(meta.default_geography||"CA")?meta.jobs_year:null);
+  const trendFromYear=findMetricValue(allData,"trend_from_year")??(selectedGeo===(meta.default_geography||"CA")?meta.trend_from_year:null);
+  const hasGeoJobs=hasJobsData(allData);
+  const hasVisibleJobs=hasJobsData(data);
+
+  renderFamilyChart();
+
+  if(!hasGeoJobs){
+    document.getElementById("statTotalJobs").textContent="-";
+    document.getElementById("statTotalJobsDesc").textContent=`StatCan annual employment is unavailable for ${geoLabel}.`;
+    document.getElementById("statAvgExposure").textContent="-";
+    document.getElementById("statHighExposure").textContent="-";
+    document.getElementById("statHighExposureDesc").textContent=`EPIAC stays national, but there are no employment weights for ${geoLabel}.`;
+    renderHistogram(new Array(11).fill(0));
+    renderTierBar([]);
+    renderPayChart([]);
+    renderOutlookMix([]);
+    return;
+  }
+
+  if(!hasVisibleJobs){
+    document.getElementById("statTotalJobs").textContent="-";
+    document.getElementById("statTotalJobsDesc").textContent=`No employment counts are available for ${shortCategoryLabel(activeCategory)} in ${geoLabel}.`;
+    document.getElementById("statAvgExposure").textContent="-";
+    document.getElementById("statHighExposure").textContent="-";
+    document.getElementById("statHighExposureDesc").textContent=`No visible employment weights are available for the selected family in ${geoLabel}.`;
+    renderHistogram(new Array(11).fill(0));
+    renderTierBar([]);
+    renderPayChart([]);
+    renderOutlookMix([]);
+    return;
+  }
+
+  let weightedHighShareSum=0,weightedCount=0;
+  for(const item of data){
+    if(item.epiac_high_exposure_pct!=null&&item.jobs){
+      weightedHighShareSum+=item.epiac_high_exposure_pct*item.jobs;
+      weightedCount+=item.jobs;
+    }
+  }
+  const weightedHighShare=weightedCount>0?weightedHighShareSum/weightedCount:0;
+  const histogram=new Array(11).fill(0);
+  for(const item of data){if(item.exposure!=null&&item.jobs)histogram[item.exposure]+=item.jobs}
+
+  document.getElementById("statTotalJobs").textContent=formatCompact(visibleJobs);
+  document.getElementById("statTotalJobsDesc").textContent=activeCategory==="All"
+    ?(jobsYear?`All families in ${geoLabel}, ${jobsYear}`:`All families in ${geoLabel}`)
+    :`${shortCategoryLabel(activeCategory)} family, ${geoJobs>0?(visibleJobs/geoJobs*100).toFixed(1):"0.0"}% of ${geoLabel}`;
+  document.getElementById("statAvgExposure").innerHTML=`<span style="color:${exposureColorCSS(weightedHighShare/10,1)}">${weightedHighShare.toFixed(0)}%</span>`;
+  renderHistogram(histogram);
+  renderTierBar(data);
+  renderPayChart(data);
+
+  const highExposureWorkers=data.reduce((sum,item)=>sum+((item.jobs||0)*((item.epiac_high_exposure_pct||0)/100)),0);
+  const highExposurePct=visibleJobs>0?highExposureWorkers/visibleJobs*100:0;
+  document.getElementById("statHighExposure").textContent=formatCompact(Math.round(highExposureWorkers));
+  document.getElementById("statHighExposureDesc").textContent=`${highExposurePct.toFixed(0)}% of visible workers are mapped to high-exposure EPIAC occupations${trendFromYear&&jobsYear?`  |  trend view uses ${trendFromYear}-${jobsYear}`:""}`;
+  renderOutlookMix(data);
+}
+
+function drawLegend(){
+  const legend=document.getElementById("gradientLegend"),gctx=legend.getContext("2d");
+  document.getElementById("legendStart").textContent=VIEW_INFO[currentView].legendStart;
+  document.getElementById("legendEnd").textContent=VIEW_INFO[currentView].legendEnd;
+  for(let x=0;x<legend.width;x++){
+    const t=x/(legend.width-1);
+    if(currentView==="treemap")gctx.fillStyle=exposureColorCSS(t*10,1);
+    else if(currentView==="trend")gctx.fillStyle=trendColorCSS(-25+t*50,1);
+    else gctx.fillStyle=outlookColorCSS(-2+t*4,1);
+    gctx.fillRect(x,0,1,legend.height);
+  }
+}
+
+function updateSubtitle(){
+  const subtitle=document.getElementById("subtitleMeta");
+  const jobsYear=findMetricValue(allData,"jobs_year");
+  const outlookStart=findMetricValue(allData,"outlook_window_start")??meta.outlook_window_start??"2025";
+  const outlookEnd=findMetricValue(allData,"outlook_window_end")??meta.outlook_window_end??"2027";
+  const exposureYear=meta.exposure_reference_year||findMetricValue(sourceData,"epiac_reference_year")||"2021";
+  const visibleCount=data.length,totalCount=meta.occupation_count||allData.length||visibleCount,filterLabel=activeCategory==="All"?"All families":shortCategoryLabel(activeCategory),viewInfo=VIEW_INFO[currentView];
+  const geo=getGeoMeta(selectedGeo);
+  const hasGeoJobs=hasJobsData(allData);
+  const geoLine=hasGeoJobs
+    ?`${geo.label_en}${jobsYear?`, ${jobsYear}`:""} annual data from <a href="https://www150.statcan.gc.ca/t1/tbl1/en/tv.action?pid=1410041601" target="_blank" rel="noopener">StatCan</a>`
+    :geo.type==="territory"
+    ?`${geo.label_en} is included in the selector, but the current StatCan occupation tables exclude the territories`
+    :`${geo.label_en} has no current StatCan occupation labour-market data`;
+  subtitle.innerHTML=`${visibleCount} of ${totalCount} NOC occupation groups shown | area = employment | ${viewInfo.colorLine}<br>Filter: ${escapeHTML(filterLabel)} | ${geoLine}<br>Exposure uses mapped StatCan EPIAC estimates from ${exposureYear} Census occupations | outlook uses ESDC ${outlookStart}-${outlookEnd} | <a href="https://karpathy.ai/jobs/" target="_blank" rel="noopener">upstream inspiration</a>`;
+}
+
+function updateEmptyState(){
+  const geo=getGeoMeta(selectedGeo);
+  const hasRenderable=getRenderableData(data).length>0;
+  if(hasRenderable){
+    emptyState.classList.remove("visible");
+    emptyState.textContent="";
+    return;
+  }
+  if(geo.type==="territory")emptyState.textContent=`StatCan's occupation labour-force tables exclude the territories, so ${geo.label_en} has no employment counts for this dashboard. Outlook metadata remains available where ESDC publishes it, but missing labour-market values stay unavailable.`;
+  else if(activeCategory!=="All")emptyState.textContent=`No employment counts are available for the ${shortCategoryLabel(activeCategory)} family in ${geo.label_en}.`;
+  else emptyState.textContent=`No employment counts are available for ${geo.label_en}.`;
+  emptyState.classList.add("visible");
+}
+
+function redraw(){if(currentView==="treemap"){layoutTreemap();drawTreemap()}else if(currentView==="trend"){layoutTrend();drawTrend()}else{layoutOutlook();drawOutlook()}}
+function resize(){dpr=window.devicePixelRatio||1;redraw();updateEmptyState()}
+
 document.querySelectorAll("#viewToggle button").forEach(button=>button.addEventListener("click",()=>setView(button.dataset.view||"treemap")));
-canvas.addEventListener("mousemove",event=>{const items=currentView==="treemap"?rects:currentView==="trend"?trendRects:outlookRects;const hit=hitTest(event.clientX,event.clientY,items);if(hit!==hovered){hovered=hit;currentView==="treemap"?drawTreemap():currentView==="trend"?drawTrend():drawOutlook()}if(hovered){showTooltip(hovered,event.clientX,event.clientY);canvas.style.cursor=occupationDetailURL(hovered)||hovered.url?"pointer":"default"}else{hideTooltip();canvas.style.cursor="default"}});
-canvas.addEventListener("click",event=>{const items=currentView==="treemap"?rects:currentView==="trend"?trendRects:outlookRects;const hit=hitTest(event.clientX,event.clientY,items);if(!hit)return;const detailUrl=occupationDetailURL(hit);if(detailUrl)window.open(detailUrl,"_blank","noopener");else if(hit.url)window.open(hit.url,"_blank","noopener")});
-canvas.addEventListener("mouseleave",()=>{hovered=null;hideTooltip();currentView==="treemap"?drawTreemap():currentView==="trend"?drawTrend():drawOutlook()});
-window.addEventListener("resize",resize);window.addEventListener("scroll",hideTooltip,{passive:true});
-fetch("data.json").then(response=>{if(!response.ok)throw new Error(`HTTP ${response.status}`);return response.json()}).then(payload=>{meta=payload.meta||{};allData=payload.occupations||[];data=[...allData];currentView=getInitialView();populateCategoryChips();document.getElementById("viewCopy").textContent=VIEW_INFO[currentView].copy;document.querySelectorAll("#viewToggle button").forEach(button=>button.classList.toggle("active",button.dataset.view===currentView));updateSubtitle();computeStats();drawLegend();resize()}).catch(error=>{console.error(error);document.getElementById("subtitleMeta").textContent="Failed to load dashboard data."});
+geographySelect.addEventListener("change",()=>setGeography(geographySelect.value));
+canvas.addEventListener("mousemove",event=>{
+  const items=currentView==="treemap"?rects:currentView==="trend"?trendRects:outlookRects;
+  const hit=hitTest(event.clientX,event.clientY,items);
+  if(hit!==hovered){
+    hovered=hit;
+    if(currentView==="treemap")drawTreemap();else if(currentView==="trend")drawTrend();else drawOutlook();
+  }
+  if(hovered){
+    showTooltip(hovered,event.clientX,event.clientY);
+    canvas.style.cursor=occupationDetailURL(hovered)||hovered.url?"pointer":"default";
+  }else{
+    hideTooltip();
+    canvas.style.cursor="default";
+  }
+});
+canvas.addEventListener("click",event=>{
+  const items=currentView==="treemap"?rects:currentView==="trend"?trendRects:outlookRects;
+  const hit=hitTest(event.clientX,event.clientY,items);
+  if(!hit)return;
+  const detailUrl=occupationDetailURL(hit);
+  if(detailUrl)window.open(detailUrl,"_blank","noopener");
+  else if(hit.url)window.open(hit.url,"_blank","noopener");
+});
+canvas.addEventListener("mouseleave",()=>{hovered=null;hideTooltip();if(currentView==="treemap")drawTreemap();else if(currentView==="trend")drawTrend();else drawOutlook()});
+window.addEventListener("resize",resize);
+window.addEventListener("scroll",hideTooltip,{passive:true});
+
+fetch("data.json").then(response=>{
+  if(!response.ok)throw new Error(`HTTP ${response.status}`);
+  return response.json();
+}).then(payload=>{
+  meta=payload.meta||{};
+  sourceData=payload.occupations||[];
+  geoLookup=Object.fromEntries(getGeoList().map(geo=>[geo.code,geo]));
+  currentView=getInitialView();
+  selectedGeo=getInitialGeo();
+  buildResolvedData();
+  populateGeographySelect();
+  populateCategoryChips();
+  updateViewCopy();
+  updateGeographyCopy();
+  document.querySelectorAll("#viewToggle button").forEach(button=>button.classList.toggle("active",button.dataset.view===currentView));
+  updateSubtitle();
+  computeStats();
+  drawLegend();
+  resize();
+}).catch(error=>{
+  console.error(error);
+  document.getElementById("subtitleMeta").textContent="Failed to load dashboard data.";
+});
 </script>
 </body>
 </html>
-
