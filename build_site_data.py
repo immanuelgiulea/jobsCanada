@@ -6,6 +6,8 @@ Reads:
 
 Writes:
 - site/data.json
+- site/family-data/*.json
+- site/job-family-*.html
 """
 
 import csv
@@ -15,12 +17,16 @@ from pathlib import Path
 
 from geography import DEFAULT_GEO_CODE, GEO_METADATA
 from noc_hierarchy import load_official_noc_structure
-from oasis_data import load_oasis_artifact
+from oasis_data import load_oasis_artifact, profiles_by_unit_group
 from outlook_data import label_from_score
 
 
 SITE_DIR = Path("site")
 OUTPUT_PATH = SITE_DIR / "data.json"
+FAMILY_DATA_DIR = SITE_DIR / "family-data"
+FAMILY_ROUTE_GLOB = "job-family-*.html"
+LEGACY_FAMILY_ROUTE_GLOB = "family-major-*.html"
+LEGACY_JOB_FAMILY_ROUTE_GLOB = "job-family-major-*.html"
 
 STATCAN_EMPLOYMENT_URL = "https://www150.statcan.gc.ca/t1/tbl1/en/tv.action?pid=1410041601"
 STATCAN_WAGES_URL = "https://www150.statcan.gc.ca/t1/tbl1/en/tv.action?pid=1410041701"
@@ -77,6 +83,65 @@ def weighted_average(pairs):
     if total_weight <= 0:
         return None
     return sum(value * weight for value, weight in valid) / total_weight
+
+
+def family_route_for_slug(slug):
+    normalized = str(slug)
+    if normalized.startswith("major-"):
+        normalized = normalized[len("major-") :]
+    return f"job-family-{normalized}.html"
+
+
+def render_family_route_document(slug):
+    slug_json = json.dumps(slug)
+    return "\n".join(
+        [
+            "<!DOCTYPE html>",
+            '<html lang="en">',
+            "<head>",
+            '<meta charset="UTF-8">',
+            '<meta name="viewport" content="width=device-width, initial-scale=1.0">',
+            "<title>Major Group Job Family Page</title>",
+            '<link rel="stylesheet" href="./job-family-page.css">',
+            "</head>",
+            "<body>",
+            '<div class="page-nav">',
+            '  <a class="back-link" href="./">Back to dashboard</a>',
+            "</div>",
+            '<div class="shell">',
+            '  <div id="app" class="loading">Loading job family page...</div>',
+            "</div>",
+            f"<script>window.__FAMILY_SLUG__ = {slug_json};</script>",
+            '<script src="./job-family-page.js"></script>',
+            "</body>",
+            "</html>",
+            "",
+        ]
+    )
+
+
+def write_family_assets(site_meta, family_pages):
+    FAMILY_DATA_DIR.mkdir(parents=True, exist_ok=True)
+    for existing_path in FAMILY_DATA_DIR.glob("*.json"):
+        existing_path.unlink()
+    for existing_path in SITE_DIR.glob(FAMILY_ROUTE_GLOB):
+        existing_path.unlink()
+    for existing_path in SITE_DIR.glob(LEGACY_FAMILY_ROUTE_GLOB):
+        existing_path.unlink()
+    for existing_path in SITE_DIR.glob(LEGACY_JOB_FAMILY_ROUTE_GLOB):
+        existing_path.unlink()
+
+    for family_page in family_pages:
+        slug = str(family_page["slug"])
+        route = str(family_page["family_route"])
+        family_payload = {
+            "meta": site_meta,
+            "family": family_page,
+        }
+        with (FAMILY_DATA_DIR / f"{slug}.json").open("w", encoding="utf-8") as handle:
+            json.dump(family_payload, handle)
+        with (SITE_DIR / route).open("w", encoding="utf-8", newline="\n") as handle:
+            handle.write(render_family_route_document(slug))
 
 
 def aggregate_major_group_stats(items, geo_code, total_geo_jobs):
@@ -154,12 +219,17 @@ def main():
     outlook_release_date = max((row["outlook_release_date"] for row in canonical_rows if row.get("outlook_release_date")), default="")
     epiac_reference_year = max(int(row["epiac_reference_year"]) for row in canonical_rows if row.get("epiac_reference_year"))
 
+    oasis_profiles_by_unit = profiles_by_unit_group(oasis_artifact) if oasis_artifact else {}
+
     occupations = []
     for row in canonical_rows:
+        family_slug = f"major-{row['major_group_code']}"
         occupations.append(
             {
                 "title": row["title"],
                 "slug": row["slug"],
+                "family_slug": family_slug,
+                "family_route": family_route_for_slug(family_slug),
                 "category": row["category"],
                 "noc_code": row["noc_code"],
                 "broad_category_code": row["broad_category_code"],
@@ -233,8 +303,11 @@ def main():
         major_group_buckets.setdefault(occupation["major_group_code"], []).append(occupation)
 
     major_groups = []
+    family_pages = []
     for major_group_code, items in sorted(major_group_buckets.items()):
         first = items[0]
+        family_slug = f"major-{major_group_code}"
+        family_route = family_route_for_slug(family_slug)
         stats_by_geo = {
             geo["code"]: aggregate_major_group_stats(items, geo["code"], total_jobs_by_geo[geo["code"]])
             for geo in GEO_METADATA
@@ -248,66 +321,79 @@ def main():
         weighted_aioe = weighted_average([(item["epiac_aioe"], item["jobs"] or 1) for item in items])
         weighted_comp = weighted_average([(item["epiac_complementarity"], item["jobs"] or 1) for item in items])
         weighted_caioe = weighted_average([(item["epiac_caioe"], item["jobs"] or 1) for item in items])
-        major_groups.append(
+        major_group_record = {
+            "title": first["major_group_title"],
+            "slug": family_slug,
+            "family_route": family_route,
+            "category": first["broad_category_title"],
+            "definition": nodes_by_code[major_group_code].get("definition") or None,
+            "noc_code": major_group_code,
+            "broad_category_code": first["broad_category_code"],
+            "broad_category_title": first["broad_category_title"],
+            "major_group_code": major_group_code,
+            "major_group_title": first["major_group_title"],
+            "official_sub_major_group_count": len({item["sub_major_group_code"] for item in items}),
+            "official_minor_group_count": len({item["minor_group_code"] for item in items}),
+            "official_unit_group_count": len(items),
+            "canonical_unit_codes": [item["noc_code"] for item in items],
+            "jobs": canada_stats["jobs"],
+            "jobs_year": canada_stats["jobs_year"],
+            "trend_pct": canada_stats["trend_pct"],
+            "trend_from_year": canada_stats["trend_from_year"],
+            "employment_change_abs": canada_stats["employment_change_abs"],
+            "unemployment_rate": canada_stats["unemployment_rate"],
+            "employment_share_pct": canada_stats["employment_share_pct"],
+            "men_share_pct": canada_stats["men_share_pct"],
+            "women_share_pct": canada_stats["women_share_pct"],
+            "pay_hourly": canada_stats["pay_hourly"],
+            "pay_weekly": canada_stats["pay_weekly"],
+            "average_hourly_wage": canada_stats["average_hourly_wage"],
+            "average_weekly_wage": canada_stats["average_weekly_wage"],
+            "employees": canada_stats["employees"],
+            "outlook_label": canada_stats["outlook_label"],
+            "outlook_score": canada_stats["outlook_score"],
+            "outlook_window_start": canada_stats["outlook_window_start"],
+            "outlook_window_end": canada_stats["outlook_window_end"],
+            "outlook_release_date": canada_stats["outlook_release_date"],
+            "exposure": round(weighted_exposure) if weighted_exposure is not None else None,
+            "exposure_metric": "high_exposure_share",
+            "exposure_rationale": "Aggregated from canonical unit groups. EPIAC values roll up unit-level mappings from published StatCan occupation groups.",
+            "metric_rationale": "This major group aggregates canonical unit groups. Labour-market counts and wages reflect the unit-group estimates allocated from published StatCan annual occupation tables using ESDC employment weights.",
+            "epiac_reference_year": epiac_reference_year,
+            "epiac_high_exposure_pct": round(weighted_high, 1) if weighted_high is not None else None,
+            "epiac_helc_pct": round(weighted_helc, 1) if weighted_helc is not None else None,
+            "epiac_hehc_pct": round(weighted_hehc, 1) if weighted_hehc is not None else None,
+            "epiac_low_pct": round(weighted_low, 1) if weighted_low is not None else None,
+            "epiac_aioe": round(weighted_aioe, 4) if weighted_aioe is not None else None,
+            "epiac_complementarity": round(weighted_comp, 4) if weighted_comp is not None else None,
+            "epiac_caioe": round(weighted_caioe, 4) if weighted_caioe is not None else None,
+            "epiac_group_code": max(((item["epiac_group_code"], item["jobs"] or 1) for item in items if item["epiac_group_code"]), key=lambda pair: pair[1], default=(None, 0))[0],
+            "epiac_group_label": max(((item["epiac_group_label"], item["jobs"] or 1) for item in items if item["epiac_group_label"]), key=lambda pair: pair[1], default=(None, 0))[0],
+            "epiac_source_title": STATCAN_EPIAC_TITLE,
+            "epiac_source_url": STATCAN_EPIAC_URL,
+            "epiac_source_groups": sorted({group for item in items for group in item["epiac_source_groups"]}),
+            "oasis_profile_count": sum(item["oasis_profile_count"] or 0 for item in items),
+            "oasis_multi_profile_unit_group_count": sum(
+                1 for item in items if item["oasis_mapping_kind"] == "one_to_many"
+            ),
+            "url": first["url"],
+            "employment_url": first["employment_url"],
+            "wages_url": first["wages_url"],
+            "outlook_url": first["outlook_url"],
+            "stats_by_geo": stats_by_geo,
+        }
+        major_groups.append(major_group_record)
+        family_pages.append(
             {
-                "title": first["major_group_title"],
-                "slug": f"major-{major_group_code}",
-                "category": first["broad_category_title"],
-                "definition": nodes_by_code[major_group_code].get("definition") or None,
-                "noc_code": major_group_code,
-                "broad_category_code": first["broad_category_code"],
-                "broad_category_title": first["broad_category_title"],
-                "major_group_code": major_group_code,
-                "major_group_title": first["major_group_title"],
-                "official_sub_major_group_count": len({item["sub_major_group_code"] for item in items}),
-                "official_minor_group_count": len({item["minor_group_code"] for item in items}),
-                "official_unit_group_count": len(items),
-                "canonical_unit_codes": [item["noc_code"] for item in items],
-                "jobs": canada_stats["jobs"],
-                "jobs_year": canada_stats["jobs_year"],
-                "trend_pct": canada_stats["trend_pct"],
-                "trend_from_year": canada_stats["trend_from_year"],
-                "employment_change_abs": canada_stats["employment_change_abs"],
-                "unemployment_rate": canada_stats["unemployment_rate"],
-                "employment_share_pct": canada_stats["employment_share_pct"],
-                "men_share_pct": canada_stats["men_share_pct"],
-                "women_share_pct": canada_stats["women_share_pct"],
-                "pay_hourly": canada_stats["pay_hourly"],
-                "pay_weekly": canada_stats["pay_weekly"],
-                "average_hourly_wage": canada_stats["average_hourly_wage"],
-                "average_weekly_wage": canada_stats["average_weekly_wage"],
-                "employees": canada_stats["employees"],
-                "outlook_label": canada_stats["outlook_label"],
-                "outlook_score": canada_stats["outlook_score"],
-                "outlook_window_start": canada_stats["outlook_window_start"],
-                "outlook_window_end": canada_stats["outlook_window_end"],
-                "outlook_release_date": canada_stats["outlook_release_date"],
-                "exposure": round(weighted_exposure) if weighted_exposure is not None else None,
-                "exposure_metric": "high_exposure_share",
-                "exposure_rationale": "Aggregated from canonical unit groups. EPIAC values roll up unit-level mappings from published StatCan occupation groups.",
-                "metric_rationale": "This major group aggregates canonical unit groups. Labour-market counts and wages reflect the unit-group estimates allocated from published StatCan annual occupation tables using ESDC employment weights.",
-                "epiac_reference_year": epiac_reference_year,
-                "epiac_high_exposure_pct": round(weighted_high, 1) if weighted_high is not None else None,
-                "epiac_helc_pct": round(weighted_helc, 1) if weighted_helc is not None else None,
-                "epiac_hehc_pct": round(weighted_hehc, 1) if weighted_hehc is not None else None,
-                "epiac_low_pct": round(weighted_low, 1) if weighted_low is not None else None,
-                "epiac_aioe": round(weighted_aioe, 4) if weighted_aioe is not None else None,
-                "epiac_complementarity": round(weighted_comp, 4) if weighted_comp is not None else None,
-                "epiac_caioe": round(weighted_caioe, 4) if weighted_caioe is not None else None,
-                "epiac_group_code": max(((item["epiac_group_code"], item["jobs"] or 1) for item in items if item["epiac_group_code"]), key=lambda pair: pair[1], default=(None, 0))[0],
-                "epiac_group_label": max(((item["epiac_group_label"], item["jobs"] or 1) for item in items if item["epiac_group_label"]), key=lambda pair: pair[1], default=(None, 0))[0],
-                "epiac_source_title": STATCAN_EPIAC_TITLE,
-                "epiac_source_url": STATCAN_EPIAC_URL,
-                "epiac_source_groups": sorted({group for item in items for group in item["epiac_source_groups"]}),
-                "oasis_profile_count": sum(item["oasis_profile_count"] or 0 for item in items),
-                "oasis_multi_profile_unit_group_count": sum(
-                    1 for item in items if item["oasis_mapping_kind"] == "one_to_many"
-                ),
-                "url": first["url"],
-                "employment_url": first["employment_url"],
-                "wages_url": first["wages_url"],
-                "outlook_url": first["outlook_url"],
-                "stats_by_geo": stats_by_geo,
+                **major_group_record,
+                "units": [
+                    {
+                        **item,
+                        "detail_route": f"occupation.html?slug={item['slug']}",
+                        "oasis_profiles": oasis_profiles_by_unit.get(item["noc_code"], []),
+                    }
+                    for item in items
+                ],
             }
         )
 
@@ -375,6 +461,8 @@ def main():
             }
         )
 
+    write_family_assets(payload["meta"], family_pages)
+
     SITE_DIR.mkdir(exist_ok=True)
     with OUTPUT_PATH.open("w", encoding="utf-8") as handle:
         json.dump(payload, handle)
@@ -382,6 +470,7 @@ def main():
     total_jobs = sum(item["jobs"] for item in occupations if item["jobs"])
     print(f"Wrote {len(occupations)} canonical occupation groups to {OUTPUT_PATH}")
     print(f"Wrote {len(major_groups)} primary major-group rollups to payload")
+    print(f"Wrote {len(family_pages)} job-family payloads to {FAMILY_DATA_DIR}")
     print(f"Total workers represented ({jobs_year}): {total_jobs:,}")
 
 

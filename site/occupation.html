@@ -73,6 +73,21 @@ function formatDecimal(value){return value==null?"-":Number(value).toFixed(2)}
 function escapeHTML(value){return String(value).replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;").replaceAll("'","&#39;")}
 function groupColor(code){if(code==="HELC")return"#d85a1f";if(code==="HEHC")return"#7bb852";return"#6d7890"}
 function params(){return new URLSearchParams(window.location.search)}
+function familyRouteForMajorSlug(slug){
+  const match=/^major-(\d{2})$/.exec(String(slug||"").trim());
+  return match?`job-family-${match[1]}.html`:null;
+}
+function familyRouteForMajorCode(code){
+  const normalized=String(code||"").trim();
+  return/^\d{2}$/.test(normalized)?`job-family-${normalized}.html`:null;
+}
+function redirectToFamily(route){
+  const query=params();
+  query.delete("slug");
+  query.delete("code");
+  const search=query.toString();
+  window.location.replace(`${route}${search?`?${search}`:""}${window.location.hash}`);
+}
 function renderNotFound(){document.title="Occupation not found";document.getElementById("app").outerHTML='<div class="empty">No occupation matched that link. Return to the <a href="./">dashboard</a> and try again.</div>'}
 function sourceLink(url,label){if(!url)return"";return `<a class="source-link" href="${url}" target="_blank" rel="noopener">${escapeHTML(label)}</a>`}
 function findBySlugOrCode(items,slug,code){
@@ -227,17 +242,22 @@ function renderPage(item,layer,meta){
       </div>
     </div>`;
 }
-fetch("data.json").then(response=>{if(!response.ok)throw new Error(`HTTP ${response.status}`);return response.json()}).then(payload=>{
-  const query=params();
-  const slug=query.get("slug");
-  const code=query.get("code");
-  const meta=payload.meta||{};
-  const majorGroup=findBySlugOrCode(payload.major_groups||[],slug,code);
-  const unitGroup=findBySlugOrCode(payload.occupations||[],slug,code);
-  if(majorGroup){renderPage(majorGroup,"major_group",meta);return}
-  if(unitGroup){renderPage(unitGroup,"unit_group",meta);return}
-  renderNotFound();
-}).catch(error=>{console.error(error);document.getElementById("app").outerHTML='<div class="empty">Failed to load occupation details.</div>'});
+const query=params();
+const legacyFamilyRoute=familyRouteForMajorSlug(query.get("slug"))||familyRouteForMajorCode(query.get("code"));
+if(legacyFamilyRoute){
+  redirectToFamily(legacyFamilyRoute);
+}else{
+  fetch("data.json").then(response=>{if(!response.ok)throw new Error(`HTTP ${response.status}`);return response.json()}).then(payload=>{
+    const slug=query.get("slug");
+    const code=query.get("code");
+    const meta=payload.meta||{};
+    const majorGroup=findBySlugOrCode(payload.major_groups||[],slug,code);
+    const unitGroup=findBySlugOrCode(payload.occupations||[],slug,code);
+    if(majorGroup){renderPage(majorGroup,"major_group",meta);return}
+    if(unitGroup){renderPage(unitGroup,"unit_group",meta);return}
+    renderNotFound();
+  }).catch(error=>{console.error(error);document.getElementById("app").outerHTML='<div class="empty">Failed to load occupation details.</div>'});
+}
 </script>
 </body>
 </html>

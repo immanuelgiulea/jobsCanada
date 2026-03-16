@@ -34,8 +34,8 @@ Conventions:
    - Any leftover U.S.-only files are either removed or moved to a clearly marked non-product archival location that is not used by the build.
    - The runtime product and build pipeline can be described as fully Canadian without caveats.
 
-8. `[ ]` Epic: Add family pages for each official major group.
-   Build dedicated major-group pages showing the selected geography's labour-market summary plus the underlying NOC unit groups and nested OaSIS occupational profiles. Preserve existing `occupation.html?slug=...` links by redirecting them to the new family page where appropriate.
+8. `[x]` Epic: Add family pages for each official major group.
+   Implemented. `build_site_data.py` now emits dedicated `job-family-*.html` routes plus per-major-group `site/family-data/*.json` payloads, the new shared job-family UI renders geography-specific major-group summaries with nested unit groups and OaSIS profiles, dashboard major-group clicks land on those routes, and legacy `occupation.html?slug=major-..` links redirect to the new pages while preserving geography state.
    Done when:
    - Every official major group has a dedicated family page route.
    - Each family page shows geography-specific summary metrics, underlying unit groups, and nested OaSIS profiles.

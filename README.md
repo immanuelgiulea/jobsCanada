@@ -29,7 +29,7 @@ Context studies using the same framework:
 1. `fetch_statcan.py`
    Downloads the StatCan occupation tables, discovers and caches the latest official OaSIS release, allocates the annual labour metrics onto the canonical 516 NOC 2021 unit groups using ESDC unit employment weights, and writes the canonical occupation outputs plus the OaSIS profile artifacts.
 2. `build_site_data.py`
-   Builds `site/data.json` for the frontend from the canonical unit-group layer and the official 45 major-group rollups.
+   Builds `site/data.json`, per-major-group `site/family-data/*.json` payloads, and dedicated `site/job-family-*.html` job-family routes from the canonical unit-group layer and the official 45 major-group rollups.
 3. `make_prompt.py`
    Builds `prompt.md`, a single markdown summary of the Canadian dataset with official EPIAC fields.
 4. `site/index.html`
@@ -57,7 +57,7 @@ Context studies using the same framework:
 | `prompt.md` | Single-file markdown summary of the Canadian dataset |
 | `docs/noc-2021-taxonomy.md` | Canonical taxonomy and methodology note for the official NOC 2021 spine |
 | `pages/` | Generated occupation summaries and source notes |
-| `site/` | Static website |
+| `site/` | Static website, including dashboard, job-family routes, and generated family payloads |
 | `epiac_data.py` | Official EPIAC source rows and mapping logic |
 | `oasis_data.py` | Official OaSIS release discovery, caching, normalization, and mapping logic |
 | `outlook_data.py` | ESDC outlook ingestion and aggregation logic |

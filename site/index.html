@@ -531,11 +531,14 @@ function drawOutlook(){
 function getCanvasPoint(clientX,clientY){const bounds=canvas.getBoundingClientRect();return{x:clientX-bounds.left,y:clientY-bounds.top}}
 function hitTest(clientX,clientY,items){const point=getCanvasPoint(clientX,clientY);for(let i=items.length-1;i>=0;i--){const rect=items[i];if(point.x>=rect.rx&&point.x<rect.rx+rect.rw&&point.y>=rect.ry&&point.y<rect.ry+rect.rh)return rect}return null}
 
-function occupationDetailURL(item){
-  if(!item||!item.slug)return null;
-  const params=new URLSearchParams({slug:item.slug});
+function familyPageURL(item){
+  if(!item)return null;
+  const route=item.family_route||(item.slug?`job-family-${String(item.slug).replace(/^major-/,"")}.html`:null);
+  if(!route)return null;
+  const params=new URLSearchParams();
   if(selectedGeo!==(meta.default_geography||"CA"))params.set("geo",selectedGeo);
-  return`occupation.html?${params.toString()}`;
+  const search=params.toString();
+  return`${route}${search?`?${search}`:""}`;
 }
 
 function showTooltip(item,clientX,clientY){
@@ -819,7 +822,7 @@ canvas.addEventListener("mousemove",event=>{
   }
   if(hovered){
     showTooltip(hovered,event.clientX,event.clientY);
-    canvas.style.cursor=occupationDetailURL(hovered)||hovered.url?"pointer":"default";
+    canvas.style.cursor=familyPageURL(hovered)||hovered.url?"pointer":"default";
   }else{
     hideTooltip();
     canvas.style.cursor="default";
@@ -829,7 +832,7 @@ canvas.addEventListener("click",event=>{
   const items=currentView==="treemap"?rects:currentView==="trend"?trendRects:outlookRects;
   const hit=hitTest(event.clientX,event.clientY,items);
   if(!hit)return;
-  const detailUrl=occupationDetailURL(hit);
+  const detailUrl=familyPageURL(hit);
   if(detailUrl)window.open(detailUrl,"_blank","noopener");
   else if(hit.url)window.open(hit.url,"_blank","noopener");
 });
