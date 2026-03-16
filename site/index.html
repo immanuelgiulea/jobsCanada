@@ -69,7 +69,8 @@ canvas#canvas{display:block;position:fixed;top:0;left:var(--sidebar-w);cursor:de
   <div class="stat-section"><h3>High-exp. share by hourly pay</h3><div class="hbar-chart" id="payChart"></div></div>
   <div class="stat-section"><h3>High-exp. share by dashboard family</h3><div class="hbar-chart" id="familyChart"></div></div>
   <div class="stat-section"><h3>Estimated high-exp. workers</h3><div class="stat-big" id="statHighExposure">-</div><div class="stat-label" id="statHighExposureDesc">Workers mapped to high-exposure EPIAC occupations</div></div>
-  <div class="stat-section"><h3>2025-2027 outlook mix</h3><div class="tier-bar" id="outlookMix"></div></div>
+  <div class="stat-section"><h3 id="outlookMixTitle">2025-2027 outlook mix</h3><div class="stat-label" id="outlookMixNote"></div><div class="tier-bar" id="outlookMix"></div></div>
+  <div class="stat-section" id="provinceDispersionSection" hidden><h3>Province outlook dispersion</h3><div class="stat-label" id="provinceDispersionNote"></div><div class="tier-bar" id="provinceDispersion"></div></div>
   <div class="gradient-legend"><span id="legendStart">Low</span><canvas id="gradientLegend" width="80" height="8"></canvas><span id="legendEnd">High</span></div>
 </div>
 <canvas id="canvas"></canvas>
@@ -114,6 +115,9 @@ function findMetricValue(items,key){for(const item of items){if(item[key]!=null)
 function getGeoList(){return Array.isArray(meta.geographies)&&meta.geographies.length?meta.geographies:[{code:"CA",label_en:"Canada",label_fr:"Canada",type:"country"}]}
 function getGeoMeta(code){return geoLookup[code]||geoLookup[meta.default_geography]||{code:"CA",label_en:"Canada",label_fr:"Canada",type:"country"}}
 function getGeoLabel(code){return getGeoMeta(code).label_en||code}
+function isCanadaGeo(code){return code===(meta.default_geography||"CA")}
+function getProvinceGeos(){return getGeoList().filter(geo=>geo.type==="province")}
+function hasOutlookStats(stats){return !!stats&&(stats.outlook_label!=null||stats.outlook_score!=null||stats.outlook_window_start!=null||stats.outlook_window_end!=null||stats.outlook_release_date!=null)}
 function getRenderableData(items){return items.filter(item=>(item.jobs||0)>0)}
 function renderNote(text){return`<div class="chart-note">${escapeHTML(text)}</div>`}
 function dashboardFamilyLabel(category){return category==="All"?"All dashboard families":`${shortCategoryLabel(category)} dashboard family`}
@@ -190,7 +194,7 @@ function updateGeographyCopy(){
   const hasGeoJobs=hasJobsData(allData);
   const hasGeoOutlook=allData.some(item=>item.outlook_label!=null||item.outlook_score!=null);
   let copy="";
-  if(selectedGeo===(meta.default_geography||"CA"))copy="Canada stays the default view. Labour-market metrics switch by geography, while StatCan EPIAC stays national and only the employment weights change.";
+  if(isCanadaGeo(selectedGeo))copy="Canada stays the default view. Labour-market metrics use Canada-wide values. The first outlook panel shows the Canada aggregate, while the second replays the visible dashboard groups across provinces so province-only labels remain visible.";
   else if(hasGeoJobs)copy=`${geo.label_en} switches jobs, trend, unemployment, wages, and outlook. EPIAC remains the same national mapping; only the employment weights change.`;
   else if(hasGeoOutlook)copy=`${geo.label_en} has ESDC outlook coverage, but the current StatCan occupation tables do not provide labour-market counts for this selector, so missing values stay unavailable.`;
   else copy=`Current source tables do not provide labour-market coverage for ${geo.label_en}. Missing values stay unavailable rather than using Canada as a fallback.`;
@@ -615,6 +619,11 @@ function renderFamilyChart(){
 }
 
 function renderOutlookMix(items){
+  const isCanadaView=isCanadaGeo(selectedGeo);
+  document.getElementById("outlookMixTitle").textContent=isCanadaView?"Canada aggregate outlook mix":"2025-2027 outlook mix";
+  document.getElementById("outlookMixNote").textContent=isCanadaView
+    ?"Each row uses the Canada-wide aggregate label for the visible dashboard groups. The province panel below re-aggregates those same groups across province labels."
+    :"Each row uses the selected geography's outlook label for the visible dashboard groups.";
   const target=document.getElementById("outlookMix");
   if(!hasJobsData(items)){target.innerHTML=renderNote("Unavailable for the current selection.");return}
   const visibleJobs=totalJobs(items);
@@ -624,6 +633,51 @@ function renderOutlookMix(items){
     const score=OUTLOOK_LABEL_TO_SCORE[label];
     const color=label==="Undetermined"?"rgba(140,140,140,.9)":outlookColorCSS(score,.9);
     return`<div class="tier-row"><div class="tier-color" style="background:${color}"></div><span class="tier-name">${label}</span><span class="tier-jobs">${formatCompact(jobs)}</span><span class="tier-pct">${visibleJobs>0?pct.toFixed(0)+"%":"-"}</span></div>`;
+  }).join("");
+}
+
+function buildProvinceDispersion(items){
+  const provinces=getProvinceGeos();
+  const buckets=Object.fromEntries(OUTLOOK_LABELS.map(label=>[label,{jobs:0,occurrences:0,provinceCodes:new Set()}]));
+  for(const item of items){
+    for(const geo of provinces){
+      const stats=item.stats_by_geo&&item.stats_by_geo[geo.code]?item.stats_by_geo[geo.code]:null;
+      if(!hasOutlookStats(stats))continue;
+      const label=OUTLOOK_LABELS.includes(stats.outlook_label)?stats.outlook_label:"Undetermined";
+      const bucket=buckets[label];
+      bucket.jobs+=stats.jobs||0;
+      bucket.occurrences+=1;
+      bucket.provinceCodes.add(geo.code);
+    }
+  }
+  const totalJobs=OUTLOOK_LABELS.reduce((sum,label)=>sum+buckets[label].jobs,0);
+  return{
+    totalJobs,
+    totalOccurrences:OUTLOOK_LABELS.reduce((sum,label)=>sum+buckets[label].occurrences,0),
+    rows:OUTLOOK_LABELS.map(label=>({
+      label,
+      jobs:buckets[label].jobs,
+      occurrences:buckets[label].occurrences,
+      provinceCount:buckets[label].provinceCodes.size,
+      pct:totalJobs>0?buckets[label].jobs/totalJobs*100:0
+    }))
+  };
+}
+
+function renderProvinceDispersion(items){
+  const section=document.getElementById("provinceDispersionSection");
+  const note=document.getElementById("provinceDispersionNote");
+  const target=document.getElementById("provinceDispersion");
+  if(!isCanadaGeo(selectedGeo)){section.hidden=true;return}
+  section.hidden=false;
+  note.textContent="Re-aggregates the visible dashboard groups across provincial labels. Province count shows where a bucket appears; jobs and share use province-level employment rather than the Canada aggregate.";
+  const dispersion=buildProvinceDispersion(items);
+  if(!dispersion.totalOccurrences){target.innerHTML=renderNote("Unavailable for the current selection.");return}
+  target.innerHTML=dispersion.rows.map(row=>{
+    const score=OUTLOOK_LABEL_TO_SCORE[row.label];
+    const color=row.label==="Undetermined"?"rgba(140,140,140,.9)":outlookColorCSS(score,.9);
+    const provinceLabel=`${row.provinceCount} prov.`;
+    return`<div class="tier-row"><div class="tier-color" style="background:${color}"></div><span class="tier-name">${escapeHTML(`${row.label} · ${provinceLabel}`)}</span><span class="tier-jobs">${formatCompact(row.jobs)}</span><span class="tier-pct">${dispersion.totalJobs>0?row.pct.toFixed(0)+"%":"-"}</span></div>`;
   }).join("");
 }
 
@@ -648,6 +702,7 @@ function computeStats(){
     renderTierBar([]);
     renderPayChart([]);
     renderOutlookMix([]);
+    renderProvinceDispersion([]);
     return;
   }
 
@@ -661,6 +716,7 @@ function computeStats(){
     renderTierBar([]);
     renderPayChart([]);
     renderOutlookMix([]);
+    renderProvinceDispersion([]);
     return;
   }
 
@@ -689,6 +745,7 @@ function computeStats(){
   document.getElementById("statHighExposure").textContent=formatCompact(Math.round(highExposureWorkers));
   document.getElementById("statHighExposureDesc").textContent=`${highExposurePct.toFixed(0)}% of visible workers are mapped to high-exposure EPIAC occupations${trendFromYear&&jobsYear?`  |  trend view uses ${trendFromYear}-${jobsYear}`:""}`;
   renderOutlookMix(data);
+  renderProvinceDispersion(data);
 }
 
 function drawLegend(){

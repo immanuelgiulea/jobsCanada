@@ -102,8 +102,8 @@ uv run python score.py
 2. `[x]` Validate the dashboard-to-NOC mapping against the official NOC 2021 hierarchy.
    Implemented. The repo now generates [`docs/dashboard-to-noc-2021.md`](docs/dashboard-to-noc-2021.md), exposes hierarchy metadata in `site/data.json`, confirms that the 43 dashboard groups partition all 516 official unit groups with no gaps or overlaps, distinguishes the dashboard's labour-force-variant families from the official broad categories, and keeps small treemap families such as Resources visibly labelled.
 
-3. `[ ]` Fix Canada outlook mix semantics and expose provincial dispersion.
-   Keep the national aggregate outlook logic, but also surface provincial bucket dispersion so labels such as `Very limited` and `Undetermined` are visible nationally when they appear in provinces.
+3. `[x]` Fix Canada outlook mix semantics and expose provincial dispersion.
+   Implemented in the current repo: the Canada view now separates the Canada-wide aggregate outlook mix from a province-dispersion summary computed from province labels, keeps province-only buckets such as `Very limited` and `Undetermined` visible nationally, and was checked against the generated Canada and Quebec source data.
 
 4. `[ ]` Fix tooltip mapping-note rendering in alternate views.
    Make the mapping note readable in `Exposure vs Change` and `Exposure vs Outlook`, with proper sentence spacing, punctuation, and wrapping.

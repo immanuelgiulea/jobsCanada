@@ -8,8 +8,8 @@
 2. `[x]` Validate the dashboard-to-NOC mapping against the official NOC 2021 hierarchy.
    Implemented. The repo now ships a reproducible dashboard-to-NOC audit, documents the 43-group concordance against the official 10/45/89/162/516 hierarchy in `docs/dashboard-to-noc-2021.md`, exposes the hierarchy metadata in `site/data.json`, and keeps small treemap families such as Resources visibly labelled instead of hiding the header.
 
-3. `[ ]` Fix Canada outlook mix semantics and expose provincial dispersion.
-   The Canada view currently hides labels such as `Very limited` and `Undetermined` that appear in provincial views like Quebec. Keep the Canada-wide aggregate outlook logic, but also surface provincial bucket dispersion nationally so province-only labels remain visible and explainable.
+3. `[x]` Bug: Fix Canada outlook mix semantics and expose provincial dispersion.
+   Implemented. The Canada view now separates the Canada-wide aggregate outlook mix from a province-dispersion summary computed from province labels, keeps province-only buckets such as `Very limited` and `Undetermined` visible nationally, and was validated against the generated Canada and Quebec source data.
 
 4. `[ ]` Fix tooltip mapping-note rendering in alternate views.
    In `Exposure vs Change` and `Exposure vs Outlook`, make the tooltip's mapping note legible with proper spacing, punctuation, and wrapping so the second sentence does not run into the first.
