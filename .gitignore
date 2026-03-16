@@ -18,6 +18,7 @@ pages/
 # Cached StatCan downloads
 tmp/statcan/
 tmp/noc/
+tmp/oasis/
 
 # Embeddings (unused in final visualization)
 embed.py

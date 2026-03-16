@@ -15,6 +15,7 @@ from pathlib import Path
 
 from geography import DEFAULT_GEO_CODE, GEO_METADATA
 from noc_hierarchy import load_official_noc_structure
+from oasis_data import load_oasis_artifact
 from outlook_data import label_from_score
 
 
@@ -145,6 +146,7 @@ def main():
         raise ValueError("occupations.csv is empty")
 
     official_noc = load_official_noc_structure()
+    oasis_artifact = load_oasis_artifact()
     jobs_year = max(int(row["data_year"]) for row in canonical_rows if row.get("data_year"))
     trend_from_year = min(int(row["trend_from_year"]) for row in canonical_rows if row.get("trend_from_year"))
     outlook_start = max(int(row["outlook_window_start"]) for row in canonical_rows if row.get("outlook_window_start"))
@@ -207,6 +209,9 @@ def main():
                 "epiac_source_title": row.get("epiac_source_title", "") or None,
                 "epiac_source_url": row.get("epiac_source_url", "") or None,
                 "epiac_source_groups": [part.strip() for part in row.get("epiac_source_groups", "").split(";") if part.strip()],
+                "oasis_profile_count": as_int(row.get("oasis_profile_count", "")),
+                "oasis_profile_codes": [part.strip() for part in row.get("oasis_profile_codes", "").split(";") if part.strip()],
+                "oasis_mapping_kind": row.get("oasis_mapping_kind", "") or None,
                 "url": row.get("url", ""),
                 "employment_url": row.get("employment_url", ""),
                 "wages_url": row.get("wages_url", ""),
@@ -294,6 +299,10 @@ def main():
                 "epiac_source_title": STATCAN_EPIAC_TITLE,
                 "epiac_source_url": STATCAN_EPIAC_URL,
                 "epiac_source_groups": sorted({group for item in items for group in item["epiac_source_groups"]}),
+                "oasis_profile_count": sum(item["oasis_profile_count"] or 0 for item in items),
+                "oasis_multi_profile_unit_group_count": sum(
+                    1 for item in items if item["oasis_mapping_kind"] == "one_to_many"
+                ),
                 "url": first["url"],
                 "employment_url": first["employment_url"],
                 "wages_url": first["wages_url"],
@@ -325,6 +334,7 @@ def main():
             "exposure_metric": "StatCan EPIAC high-exposure share",
             "exposure_metric_scale": "0-10 display score derived from the share of workers in high-exposure EPIAC occupations",
             "exposure_note": "Official EPIAC fields are mapped from published StatCan occupation groups onto the canonical NOC 2021 unit groups.",
+            "profile_layer_note": "Official OaSIS occupational profiles attach to canonical NOC 2021 unit groups through an explicit generated mapping table.",
             "source": "Statistics Canada annual occupation tables rebuilt onto the canonical NOC 2021 spine",
             "source_tables": [
                 {"name": "14-10-0416-01 Labour force characteristics by occupation, annual", "url": STATCAN_EMPLOYMENT_URL},
@@ -342,6 +352,28 @@ def main():
         "occupations": occupations,
         "major_groups": major_groups,
     }
+
+    if oasis_artifact:
+        oasis_meta = oasis_artifact.get("meta", {})
+        payload["meta"]["oasis"] = {
+            "title": oasis_meta.get("title"),
+            "resolved_year": oasis_meta.get("resolved_year"),
+            "resolved_version": oasis_meta.get("resolved_version"),
+            "package_id": oasis_meta.get("package_id"),
+            "package_url": oasis_meta.get("package_url"),
+            "package_metadata_created": oasis_meta.get("package_metadata_created"),
+            "package_metadata_modified": oasis_meta.get("package_metadata_modified"),
+            "profile_count": oasis_meta.get("profile_count"),
+            "unit_group_count": oasis_meta.get("unit_group_count"),
+            "one_to_many_unit_group_count": oasis_meta.get("one_to_many_unit_group_count"),
+            "generated_at_utc": oasis_meta.get("generated_at_utc"),
+        }
+        payload["meta"]["source_tables"].append(
+            {
+                "name": str(oasis_meta.get("title") or "Occupational and Skills Information System (OaSIS)"),
+                "url": str(oasis_meta.get("package_url") or ""),
+            }
+        )
 
     SITE_DIR.mkdir(exist_ok=True)
     with OUTPUT_PATH.open("w", encoding="utf-8") as handle:

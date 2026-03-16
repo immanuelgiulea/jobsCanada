@@ -25,6 +25,7 @@ from urllib.request import urlopen
 from epiac_data import load_group_epiac
 from geography import DEFAULT_GEO_CODE, GEO_CODES, STATCAN_GEO_TO_CODE
 from noc_hierarchy import load_official_noc_structure
+from oasis_data import build_and_write_oasis_artifacts, profiles_by_unit_group, unit_group_lookup
 from outlook_data import expand_group_prefixes, load_group_outlooks, load_unit_outlooks
 
 
@@ -199,6 +200,130 @@ def fmt_currency(value: float | None) -> str:
     if value is None:
         return "-"
     return f"${value:.2f}"
+
+
+def markdown_bullets(items: list[object], *, empty_message: str | None = None) -> list[str]:
+    if not items:
+        return [empty_message] if empty_message else []
+
+    lines: list[str] = []
+    for item in items:
+        if item is None:
+            continue
+        text = str(item).strip()
+        if text:
+            lines.append(f"- {text}")
+    return lines or ([empty_message] if empty_message else [])
+
+
+def markdown_exclusions(items: list[dict[str, object]]) -> list[str]:
+    if not items:
+        return ["No explicit exclusions listed in the current OaSIS release."]
+
+    lines = []
+    for item in items:
+        code = str(item.get("excluded_profile_code") or "").strip()
+        title = str(item.get("job_title") or "").strip()
+        if code and title:
+            lines.append(f"- {code}: {title}")
+        elif title:
+            lines.append(f"- {title}")
+        elif code:
+            lines.append(f"- {code}")
+    return lines or ["No explicit exclusions listed in the current OaSIS release."]
+
+
+def markdown_core_competencies(items: list[dict[str, object]]) -> list[str]:
+    if not items:
+        return ["No core competencies listed in the current OaSIS release."]
+
+    lines = []
+    for item in items:
+        competency = str(item.get("competency") or "").strip()
+        statement = str(item.get("statement") or "").strip()
+        if competency and statement:
+            lines.append(f"- {competency}: {statement}")
+        elif competency:
+            lines.append(f"- {competency}")
+        elif statement:
+            lines.append(f"- {statement}")
+    return lines or ["No core competencies listed in the current OaSIS release."]
+
+
+def build_oasis_page_lines(
+    unit_code: str,
+    oasis_meta: dict[str, object],
+    oasis_unit_group: dict[str, object],
+    oasis_profiles: list[dict[str, object]],
+) -> list[str]:
+    profile_count = int(oasis_unit_group["profile_count"])
+    mapping_kind = str(oasis_unit_group["mapping_kind"]).replace("_", " ")
+    lines = [
+        "## OaSIS profile coverage",
+        "",
+        f"- Resolved OaSIS release: {oasis_meta['title']}",
+        f"- Official OaSIS package: {oasis_meta['package_url']}",
+        f"- OaSIS profiles attached to this unit group: {profile_count}",
+        f"- Mapping mode: {mapping_kind}",
+        f"- Explicit mapping method: {oasis_meta['mapping_method']}",
+    ]
+    if not oasis_profiles:
+        lines.extend(
+            [
+                "",
+                "No OaSIS profiles were attached to this unit group in the generated artifact. See `oasis.json` and `oasis_profile_mappings.csv` for the audit report.",
+            ]
+        )
+        return lines
+
+    lines.extend(
+        [
+            "",
+            f"This canonical unit group ({unit_code}) maps to {profile_count} official OaSIS profile(s) in the resolved release.",
+        ]
+    )
+    for profile in oasis_profiles:
+        example_titles = [str(item.get("job_title_text") or "").strip() for item in profile["example_titles"]]
+        lines.extend(
+            [
+                "",
+                f"### {profile['oasis_profile_code']} {profile['profile_title']}",
+                "",
+                profile["lead_statement"] or "Lead statement unavailable in the current OaSIS release.",
+                "",
+                "#### Core competencies",
+                "",
+            ]
+        )
+        lines.extend(markdown_core_competencies(profile["core_competencies"]))
+        lines.extend(["", "#### Main duties", ""])
+        lines.extend(markdown_bullets(profile["main_duties"], empty_message="No main duties listed in the current OaSIS release."))
+        lines.extend(["", "#### Employment requirements", ""])
+        lines.extend(
+            markdown_bullets(
+                profile["employment_requirements"],
+                empty_message="No employment requirements listed in the current OaSIS release.",
+            )
+        )
+        lines.extend(["", "#### Example titles", ""])
+        lines.extend(markdown_bullets(example_titles, empty_message="No example titles listed in the current OaSIS release."))
+        lines.extend(["", "#### Workplaces and employers", ""])
+        lines.extend(
+            markdown_bullets(
+                profile["workplaces_employers"],
+                empty_message="No workplaces or employers listed in the current OaSIS release.",
+            )
+        )
+        lines.extend(["", "#### Additional information", ""])
+        lines.extend(
+            markdown_bullets(
+                profile["additional_information"],
+                empty_message="No additional information listed in the current OaSIS release.",
+            )
+        )
+        lines.extend(["", "#### Exclusions", ""])
+        lines.extend(markdown_exclusions(profile["exclusions"]))
+    return lines
 
 
 def empty_geo_metrics() -> dict[str, dict[str, dict[int, float]]]:
@@ -532,6 +657,10 @@ def main() -> None:
         record["epiac"] = epiac_by_group.get(source_group_code, {})
 
     official_noc = load_official_noc_structure()
+    oasis_artifact = build_and_write_oasis_artifacts()
+    oasis_unit_groups = unit_group_lookup(oasis_artifact)
+    oasis_profiles_by_unit = profiles_by_unit_group(oasis_artifact)
+    oasis_meta = oasis_artifact["meta"]
     unit_outlooks_by_geo, unit_outlook_meta = load_unit_outlooks()
     official_unit_codes = [str(unit["code"]) for unit in official_noc["unit_groups"]]
     unit_to_source_group, source_units_by_group = build_source_group_unit_map(
@@ -590,6 +719,9 @@ def main() -> None:
         "epiac_source_url",
         "epiac_source_note",
         "epiac_source_groups",
+        "oasis_profile_count",
+        "oasis_profile_codes",
+        "oasis_mapping_kind",
         "url",
         "employment_url",
         "wages_url",
@@ -603,6 +735,7 @@ def main() -> None:
         source_group_code = unit_to_source_group[unit_code]
         source_record = source_groups[source_group_code]
         source_epiac = source_record["epiac"]
+        oasis_unit_group = oasis_unit_groups[unit_code]
         canonical_records[unit_code] = {
             "title": unit["title"],
             "category": unit["broad_category_title"],
@@ -634,6 +767,9 @@ def main() -> None:
             "epiac_source_url": source_epiac.get("epiac_source_url"),
             "epiac_source_note": str(source_epiac.get("epiac_source_note", "")),
             "epiac_source_groups": source_epiac.get("epiac_source_groups", []),
+            "oasis_profile_count": oasis_unit_group["profile_count"],
+            "oasis_profile_codes": oasis_unit_group["profile_codes"],
+            "oasis_mapping_kind": oasis_unit_group["mapping_kind"],
             "url": str(official_noc["source_page_url"]),
             "employment_url": source_record["employment_url"],
             "wages_url": source_record["wages_url"],
@@ -737,6 +873,9 @@ def main() -> None:
             "epiac_source_url": record["epiac_source_url"] or "",
             "epiac_source_note": record["epiac_source_note"] or "",
             "epiac_source_groups": "; ".join(record["epiac_source_groups"]),
+            "oasis_profile_count": csv_int(record["oasis_profile_count"]),
+            "oasis_profile_codes": "; ".join(record["oasis_profile_codes"]),
+            "oasis_mapping_kind": record["oasis_mapping_kind"],
             "url": record["url"],
             "employment_url": record["employment_url"],
             "wages_url": record["wages_url"],
@@ -761,6 +900,8 @@ def main() -> None:
                 "epiac_display_score": row["epiac_display_score"],
                 "epiac_group_label": row["epiac_group_label"],
                 "epiac_high_exposure_pct": row["epiac_high_exposure_pct"],
+                "oasis_profile_count": row["oasis_profile_count"],
+                "oasis_mapping_kind": row["oasis_mapping_kind"],
                 "url": record["url"],
             }
         )
@@ -798,6 +939,7 @@ def main() -> None:
             f"- Dominant EPIAC group: {record['epiac_group_label'] or '-'}",
             f"- Average AIOE / complementarity ({record['epiac_reference_year']} mapped): {(record['epiac_aioe'] or 0):.2f} / {(record['epiac_complementarity'] or 0):.2f}",
             f"- Employment outlook ({unit_outlook_meta['window_start']} to {unit_outlook_meta['window_end']}): {canada_stats['outlook_label'] or '-'}",
+            f"- Attached OaSIS occupational profiles: {record['oasis_profile_count']}",
             f"- Median weekly wage ({canada_wages_year} published-source rate): {fmt_currency(canada_stats['pay_weekly'])}",
             f"- Average hourly wage ({canada_wages_year} published-source rate): {fmt_currency(canada_stats['average_hourly_wage'])}",
             f"- Average weekly wage ({canada_wages_year} published-source rate): {fmt_currency(canada_stats['average_weekly_wage'])}",
@@ -812,22 +954,41 @@ def main() -> None:
             "",
             record["epiac_source_note"],
             "",
-            "## Source tables",
-            "",
-            f"- Official NOC 2021 classification structure: {official_noc['source_url']}",
-            f"- Labour force characteristics by occupation, annual: {record['employment_url']}",
-            f"- Employee wages by occupation, annual: {record['wages_url']}",
-            f"- {record['epiac_source_title']}: {record['epiac_source_url']}",
-            f"- {unit_outlook_meta['title']}: {unit_outlook_meta['page_url']}",
-            "",
-            "## Geography coverage note",
-            "",
-            "The StatCan occupation tables in this project cover Canada and the provinces only. Yukon, the Northwest Territories, and Nunavut remain in the generated geography metadata, but labour-market metrics for those selectors are left unavailable rather than backfilled.",
         ]
+        lines.extend(
+            build_oasis_page_lines(
+                str(record["noc_code"]),
+                oasis_meta,
+                oasis_unit_groups[str(record["noc_code"])],
+                oasis_profiles_by_unit.get(str(record["noc_code"]), []),
+            )
+        )
+        lines.extend(
+            [
+                "",
+                "## Source tables",
+                "",
+                f"- Official NOC 2021 classification structure: {official_noc['source_url']}",
+                f"- Labour force characteristics by occupation, annual: {record['employment_url']}",
+                f"- Employee wages by occupation, annual: {record['wages_url']}",
+                f"- {record['epiac_source_title']}: {record['epiac_source_url']}",
+                f"- {unit_outlook_meta['title']}: {unit_outlook_meta['page_url']}",
+                f"- {oasis_meta['title']}: {oasis_meta['package_url']}",
+                "",
+                "## Geography coverage note",
+                "",
+                "The StatCan occupation tables in this project cover Canada and the provinces only. Yukon, the Northwest Territories, and Nunavut remain in the generated geography metadata, but labour-market metrics for those selectors are left unavailable rather than backfilled.",
+            ]
+        )
         (PAGES_DIR / f"{record['slug']}.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
     print(f"Wrote {len(canonical_rows)} canonical unit groups to {CANONICAL_CSV_PATH}")
     print(f"Wrote {len(occupations_index)} canonical occupation entries to {CANONICAL_INDEX_PATH}")
+    print(
+        "Wrote "
+        f"{oasis_meta['profile_count']} OaSIS profiles across {oasis_meta['unit_group_count']} unit groups to oasis.json"
+    )
+    print("Wrote explicit OaSIS profile mappings to oasis_profile_mappings.csv")
     print(f"Wrote {len(canonical_rows)} markdown summaries to {PAGES_DIR}/")
     print("Geography coverage:")
     print("  - Labour-market data: Canada and 10 provinces")

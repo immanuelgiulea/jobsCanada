@@ -113,6 +113,8 @@ function renderPage(item,layer,meta){
       <dt>Broad category</dt><dd>${escapeHTML(item.category)}</dd>
       <dt>Major group</dt><dd>${escapeHTML(`${item.noc_code} ${item.title}`)}</dd>
       <dt>Canonical unit groups</dt><dd>${formatCompact(item.official_unit_group_count)}</dd>
+      <dt>Attached OaSIS profiles</dt><dd>${formatCompact(item.oasis_profile_count)}</dd>
+      <dt>Unit groups with split OaSIS profiles</dt><dd>${formatCompact(item.oasis_multi_profile_unit_group_count)}</dd>
       <dt>Employed (${jobsYear} est.)</dt><dd>${formatCompact(item.jobs)}</dd>
       <dt>Paid employees (${jobsYear} est.)</dt><dd>${formatCompact(item.employees)}</dd>
       <dt>Employment share (${jobsYear})</dt><dd>${formatPercent(item.employment_share_pct)}</dd>
@@ -125,6 +127,7 @@ function renderPage(item,layer,meta){
       <dt>Major group</dt><dd>${escapeHTML(`${item.major_group_code||"-"} ${item.major_group_title||""}`.trim())}</dd>
       <dt>Sub-major group</dt><dd>${escapeHTML(`${item.sub_major_group_code||"-"} ${item.sub_major_group_title||""}`.trim())}</dd>
       <dt>Minor group</dt><dd>${escapeHTML(`${item.minor_group_code||"-"} ${item.minor_group_title||""}`.trim())}</dd>
+      <dt>Attached OaSIS profiles</dt><dd>${formatCompact(item.oasis_profile_count)} (${escapeHTML((item.oasis_mapping_kind||"missing").replaceAll("_"," "))})</dd>
       <dt>Employed (${jobsYear} est.)</dt><dd>${formatCompact(item.jobs)}</dd>
       <dt>Paid employees (${jobsYear} est.)</dt><dd>${formatCompact(item.employees)}</dd>
       <dt>Employment share (${jobsYear})</dt><dd>${formatPercent(item.employment_share_pct)}</dd>
@@ -143,6 +146,7 @@ function renderPage(item,layer,meta){
           <div class="meta-row">
             <span class="pill">${formatCompact(item.jobs)} employed (${jobsYear} est.)</span>
             <span class="pill">${formatMoney(item.pay_hourly)} median hourly wage</span>
+            <span class="pill">${formatCompact(item.oasis_profile_count)} OaSIS profiles</span>
             <span class="pill" style="color:${groupColor(item.epiac_group_code)};border-color:rgba(255,255,255,.12)">${escapeHTML(groupLabel)}</span>
           </div>
           <div class="note" style="font-size:13px">This page uses the canonical NOC 2021 spine. Labour-market counts and wages are estimated from published StatCan annual occupation tables allocated onto official unit groups, outlook comes from the unit-level ESDC release, and EPIAC fields are mapped from published StatCan occupation groups.</div>

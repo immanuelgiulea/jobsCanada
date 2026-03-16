@@ -5,7 +5,7 @@
 Conventions:
 - One backlog item = one implementation thread.
 - Items 3-4 are bug/task-sized follow-ups.
-- Items 5-15 are epics.
+- Items 5-16 are epics.
 - Every open item includes `Done when:` criteria.
 
 1. `[x]` Add full geography mode to the current dashboard.
@@ -23,15 +23,18 @@ Conventions:
 5. `[x]` Epic: Rebuild the occupation model around the official NOC 2021 spine.
    Implemented. The repo now treats the official 516 NOC 2021 unit groups as canonical occupation IDs, exposes the 45 official major groups as the primary dashboard roll-up layer, and lets downstream consumers resolve occupations by canonical unit-group codes or slugs from `occupations.csv`, `occupations.json`, and `site/data.json`.
 
-6. `[ ]` Epic: Replace the remaining legacy U.S. detail/profile layer with latest-official OaSIS data.
-   Add an importer that discovers the latest official OaSIS version at fetch time, records the resolved version in generated metadata, and attaches OaSIS unit groups and occupational profiles to the canonical 516-unit-group spine. Support one-to-many mappings where OaSIS is more granular than a unit group.
-   Done when:
-   - The repo can fetch and cache the latest official OaSIS release reproducibly.
-   - Generated OaSIS artifacts record resolved version, source URLs, and fetch metadata.
-   - OaSIS profiles attach to canonical unit groups through explicit mapping tables, including one-to-many cases.
-   - Unmapped or ambiguous profiles are reported instead of silently dropped.
+6. `[x]` Epic: Replace the remaining legacy U.S. detail/profile layer with latest-official OaSIS data.
+   Implemented. `fetch_statcan.py` now resolves the latest official OaSIS package from the Open Canada CKAN API at fetch time, caches the English CSV release under `tmp/oasis/`, writes generated `oasis.json` and `oasis_profile_mappings.csv` artifacts with resolved version/source/fetch metadata, and attaches all 900 OaSIS occupational profiles to the canonical 516-unit-group spine through an explicit mapping table. One-to-many mappings are preserved on the canonical rows, in `site/data.json`, and in the generated markdown pages, while unmapped or ambiguous profiles are surfaced in the OaSIS audit report instead of being dropped.
 
-7. `[ ]` Epic: Add family pages for each official major group.
+7. `[ ]` Epic: Remove all remaining U.S.-only product remnants after the OaSIS migration.
+   After item 6, the runtime product, build pipeline, generated artifacts, and user-facing copy should be fully Canadian. Any remaining U.S.-only material should either be deleted or quarantined as clearly non-functional archival history.
+   Done when:
+   - No active build step, generated artifact, route, or UI surface depends on U.S.-only sources such as BLS or O*NET.
+   - No user-facing copy, links, labels, tooltips, or documentation in the shipped product references U.S.-only sources or terminology.
+   - Any leftover U.S.-only files are either removed or moved to a clearly marked non-product archival location that is not used by the build.
+   - The runtime product and build pipeline can be described as fully Canadian without caveats.
+
+8. `[ ]` Epic: Add family pages for each official major group.
    Build dedicated major-group pages showing the selected geography's labour-market summary plus the underlying NOC unit groups and nested OaSIS occupational profiles. Preserve existing `occupation.html?slug=...` links by redirecting them to the new family page where appropriate.
    Done when:
    - Every official major group has a dedicated family page route.
@@ -39,7 +42,7 @@ Conventions:
    - Existing `occupation.html?slug=...` links redirect successfully to the new family page.
    - Family pages are usable on both desktop and mobile layouts.
 
-8. `[ ]` Epic: Add global NOC search and deep linking.
+9. `[ ]` Epic: Add global NOC search and deep linking.
    Add one search input that matches major-group codes, unit-group codes, occupational profile codes, titles, and aliases. Exact code hits should open the correct family page and focus the matching unit group or profile. Build a compact search index rather than pushing full OaSIS profile payloads into the main dashboard JSON.
    Done when:
    - Search indexes major-group codes, unit-group codes, OaSIS profile codes, titles, and aliases.
@@ -47,7 +50,7 @@ Conventions:
    - Ambiguous text searches return grouped suggestions without breaking navigation state.
    - Search is driven by a generated compact index rather than full page payloads.
 
-9. `[ ]` Epic: Map the 44 occupations from GDPval onto the dashboard.
+10. `[ ]` Epic: Map the 44 occupations from GDPval onto the dashboard.
    Investigate whether GDPval can be defensibly mapped onto the canonical occupation spine or whether it should be presented in a separate comparison view with its own occupation grain and methodology note. Do not force a one-to-one mapping unless the correspondence is explicit and auditable.
    Done when:
    - The GDPval occupation grain and code system are documented in the repo.
@@ -55,7 +58,7 @@ Conventions:
    - Unmapped GDPval records remain available in a source-grain comparison view instead of being discarded.
    - GDPval never overwrites official StatCan/ESDC fields.
 
-10. `[ ]` Epic: Add task-level exposure estimates from Eloundou et al. (2023).
+11. `[ ]` Epic: Add task-level exposure estimates from Eloundou et al. (2023).
    Evaluate whether the paper's task-speedup framework can be attached to OaSIS tasks, descriptors, or unit groups with a strict auditable crosswalk. Otherwise keep it in a separate research layer at its native grain. Preserve the original methodological framing that the estimate is about whether an LLM could theoretically make a task at least twice as fast.
    Done when:
    - The source methodology, task grain, and citation are captured in generated metadata.
@@ -63,7 +66,7 @@ Conventions:
    - If no strict crosswalk exists, the dataset is exposed at its native grain in a separate research layer.
    - The UI preserves the original task-speedup framing and does not relabel it as official exposure.
 
-11. `[ ]` Epic: Add a view for academic research overlays.
+12. `[ ]` Epic: Add a view for academic research overlays.
    Create a dedicated research view that can compare or summarize academic measures such as AIOE, task-level exposure, GDPval, and other defensible research inputs without overloading the main dashboard view.
    Done when:
    - A dedicated academic research route exists and is reachable from the main navigation.
@@ -71,7 +74,7 @@ Conventions:
    - Incompatible datasets stay visibly separate instead of being blended into a single composite score.
    - The academic research view does not change the main dashboard ranking or coloring rules.
 
-12. `[ ]` Epic: Add a view for industry research overlays.
+13. `[ ]` Epic: Add a view for industry research overlays.
    Create a separate industry research view so private-sector methodologies can be shown alongside, but not conflated with, the official StatCan/ESDC pipeline and academic measures.
    Done when:
    - A dedicated industry research route exists and is reachable from the main navigation.
@@ -79,7 +82,7 @@ Conventions:
    - Industry layers remain visually and textually distinct from official and academic measures.
    - Unmapped industry datasets can still be displayed at source grain.
 
-13. `[ ]` Epic: Add a benchmark engine at the task-family level.
+14. `[ ]` Epic: Add a benchmark engine at the task-family level.
    Introduce a benchmark data model keyed to the canonical occupation spine so task-family benchmarking, measured benchmark performance, and model evaluation can be stored with clear provenance.
    Done when:
    - Benchmark definitions, runs, and results are stored against stable canonical occupation/task-family IDs.
@@ -87,7 +90,7 @@ Conventions:
    - Benchmark data can be queried by occupation, task family, and model without bespoke one-off transforms.
    - The engine supports later dashboard/workbench consumption without redesigning the schema.
 
-14. `[ ]` Epic: Add a NOC + OaSIS workbench/dashboard surface.
+15. `[ ]` Epic: Add a NOC + OaSIS workbench/dashboard surface.
    Build a workbench view that sits on top of the canonical occupation spine and benchmark engine and can show exposure, measured benchmark performance, occupation similarity, and model recommendations.
    Done when:
    - A dedicated workbench route exists on top of the canonical occupation spine.
@@ -95,7 +98,7 @@ Conventions:
    - Workbench results can drill from roll-up groups to unit groups and linked OaSIS profiles.
    - The workbench runs directly on the canonical NOC 2021 spine without secondary taxonomy adapters.
 
-15. `[ ]` Epic: Add EN/FR language switching last.
+16. `[ ]` Epic: Add EN/FR language switching last.
    Implement the bilingual toggle only after the data model, routes, labels, research views, benchmark engine, and workbench surface stabilize. The language switch should cover dashboard copy, family/profile pages, navigation, search labels, workbench text, and research-view text.
    Done when:
    - The app supports a stable EN/FR toggle that persists across routes and deep links.

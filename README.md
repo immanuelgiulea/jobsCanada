@@ -2,6 +2,8 @@
 
 Analyzing how exposed Canadian occupation groups are to AI using official Statistics Canada and ESDC sources instead of the U.S. Bureau of Labor Statistics.
 
+![Current Canadian dashboard](jobs.png)
+
 ## What's here
 
 This fork now combines three Canadian data sources:
@@ -9,6 +11,7 @@ This fork now combines three Canadian data sources:
 - [14-10-0416-01](https://www150.statcan.gc.ca/t1/tbl1/en/tv.action?pid=1410041601) Labour force characteristics by occupation, annual
 - [14-10-0417-01](https://www150.statcan.gc.ca/t1/tbl1/en/tv.action?pid=1410041701) Employee wages by occupation, annual
 - [2025-2027 Employment Outlooks - NOC 2021](https://open.canada.ca/data/en/dataset/b0e112e9-cf53-4e79-8838-23cd98debe5b/resource/cb52e1d0-ab62-4357-91cc-d8f5a2114e02)
+- [Occupational and Skills Information System (OaSIS) - 2025 Version 1.0](https://open.canada.ca/data/en/dataset/10ce43bd-fb58-4969-806b-4bffebc87bec)
 
 AI exposure is no longer driven by an LLM score in the site build. The dashboard now uses official StatCan EPIAC data from:
 
@@ -24,7 +27,7 @@ Context studies using the same framework:
 ## Data pipeline
 
 1. `fetch_statcan.py`
-   Downloads the StatCan occupation tables, allocates those annual labour metrics onto the canonical 516 NOC 2021 unit groups using ESDC unit employment weights, and writes the canonical occupation outputs.
+   Downloads the StatCan occupation tables, discovers and caches the latest official OaSIS release, allocates the annual labour metrics onto the canonical 516 NOC 2021 unit groups using ESDC unit employment weights, and writes the canonical occupation outputs plus the OaSIS profile artifacts.
 2. `build_site_data.py`
    Builds `site/data.json` for the frontend from the canonical unit-group layer and the official 45 major-group rollups.
 3. `make_prompt.py`
@@ -38,11 +41,14 @@ Context studies using the same framework:
 |------|-------------|
 | `occupations.json` | Canonical NOC 2021 unit-group index with NOC codes and major-group metadata |
 | `occupations.csv` | Canonical 516-unit-group labour, outlook, and EPIAC fields |
+| `oasis.json` | Generated official OaSIS profile artifact with resolved release metadata, explicit canonical mappings, and audit reports |
+| `oasis_profile_mappings.csv` | Flat explicit OaSIS profile-to-canonical-unit mapping table with one-to-one vs one-to-many cardinality |
 | `prompt.md` | Single-file markdown summary of the Canadian dataset |
 | `docs/noc-2021-taxonomy.md` | Canonical taxonomy and methodology note for the official NOC 2021 spine |
 | `pages/` | Generated occupation summaries and source notes |
 | `site/` | Static website |
 | `epiac_data.py` | Official EPIAC source rows and mapping logic |
+| `oasis_data.py` | Official OaSIS release discovery, caching, normalization, and mapping logic |
 | `outlook_data.py` | ESDC outlook ingestion and aggregation logic |
 | `score.py` | Optional legacy LLM scoring script, not used by the site build |
 
@@ -56,6 +62,7 @@ Context studies using the same framework:
   - employment and wages: latest StatCan annual tables through **2025**
   - outlook: province-aggregated ESDC outlook data for **2025-2027**
 - The dataset uses the official **516 Canadian NOC 2021 unit groups** as canonical IDs and the official **45 major groups** as the primary dashboard roll-up.
+- The repo now attaches the official **900 OaSIS occupational profiles** to that canonical spine through an explicit generated mapping table, preserving one-to-many cases where OaSIS is more granular than a unit group.
 
 ## Setup
 
@@ -91,8 +98,10 @@ uv run python score.py
 ## Notes
 
 - The StatCan downloads are cached in `tmp/statcan/`.
+- The latest official OaSIS package is cached in `tmp/oasis/` after `fetch_statcan.py` runs.
 - `pages/` is generated output and can be recreated from `fetch_statcan.py`.
 - The EPIAC mapping is an inference from the closest published StatCan occupation groups to the canonical NOC 2021 spine. Each generated row and page includes a mapping note.
+- OaSIS mappings are explicit rather than inferred: `oasis_profile_mappings.csv` records every attached profile row, and `oasis.json` reports any unmapped or ambiguous profiles.
 
 ## Backlog
 
