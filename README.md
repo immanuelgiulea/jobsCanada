@@ -1,19 +1,19 @@
 # AI Exposure of the Canadian Job Market
 
-Analyzing how exposed Canadian occupation groups are to AI using official Statistics Canada and ESDC sources instead of the U.S. Bureau of Labor Statistics.
+Analyzing how exposed Canadian occupation groups are to AI using official Statistics Canada, ESDC, and OaSIS sources.
 
 ![Current Canadian dashboard](jobs.png)
 
 ## What's here
 
-This fork now combines three Canadian data sources:
+This repo combines four Canadian data sources:
 
 - [14-10-0416-01](https://www150.statcan.gc.ca/t1/tbl1/en/tv.action?pid=1410041601) Labour force characteristics by occupation, annual
 - [14-10-0417-01](https://www150.statcan.gc.ca/t1/tbl1/en/tv.action?pid=1410041701) Employee wages by occupation, annual
 - [2025-2027 Employment Outlooks - NOC 2021](https://open.canada.ca/data/en/dataset/b0e112e9-cf53-4e79-8838-23cd98debe5b/resource/cb52e1d0-ab62-4357-91cc-d8f5a2114e02)
 - [Occupational and Skills Information System (OaSIS) - 2025 Version 1.0](https://open.canada.ca/data/en/dataset/10ce43bd-fb58-4969-806b-4bffebc87bec)
 
-AI exposure is no longer driven by an LLM score in the site build. The dashboard now uses official StatCan EPIAC data from:
+AI exposure in the site build uses official StatCan EPIAC data from:
 
 - [Experimental Estimates of Potential Artificial Intelligence Occupational Exposure in Canada, 2024](https://www150.statcan.gc.ca/n1/pub/11f0019m/11f0019m2024005-eng.htm)
 
@@ -35,6 +35,17 @@ Context studies using the same framework:
 4. `site/index.html`
    Interactive visualization where area = Canadian employment and color = EPIAC high-exposure share.
 
+## Current architecture
+
+- The active data pipeline is fully Canadian and uses official **StatCan / ESDC / OaSIS** sources.
+- The dataset uses the official **516 Canadian NOC 2021 unit groups** as canonical IDs and the official **45 major groups** as the primary dashboard roll-up.
+- Exposure is based on **official StatCan EPIAC / AIOE / complementarity** data.
+- The dashboard mixes different reference periods intentionally:
+  - exposure: mapped from the StatCan 2024 EPIAC study using **2021 Census** occupation data
+  - employment and wages: latest StatCan annual tables through **2025**
+  - outlook: province-aggregated ESDC outlook data for **2025-2027**
+- The repo attaches the official **900 OaSIS occupational profiles** to the canonical spine through an explicit generated mapping table, preserving one-to-many cases where OaSIS is more granular than a unit group.
+
 ## Key files
 
 | File | Description |
@@ -50,19 +61,7 @@ Context studies using the same framework:
 | `epiac_data.py` | Official EPIAC source rows and mapping logic |
 | `oasis_data.py` | Official OaSIS release discovery, caching, normalization, and mapping logic |
 | `outlook_data.py` | ESDC outlook ingestion and aggregation logic |
-| `score.py` | Optional legacy LLM scoring script, not used by the site build |
-
-## Important differences from upstream
-
-- Source data is **Canadian** and based on **StatCan / ESDC**, not BLS handbook pages.
-- The upstream repo used a smaller **43-group** dashboard model tied to a U.S.-oriented taxonomy; this fork migrated to the Canadian **NOC 2021** hierarchy with **45 official major groups** and **516 canonical unit groups**.
-- Exposure is based on **official StatCan EPIAC / AIOE / complementarity** data, not only an LLM judgment.
-- The dashboard mixes different reference periods intentionally:
-  - exposure: mapped from the StatCan 2024 EPIAC study using **2021 Census** occupation data
-  - employment and wages: latest StatCan annual tables through **2025**
-  - outlook: province-aggregated ESDC outlook data for **2025-2027**
-- The dataset uses the official **516 Canadian NOC 2021 unit groups** as canonical IDs and the official **45 major groups** as the primary dashboard roll-up.
-- The repo now attaches the official **900 OaSIS occupational profiles** to that canonical spine through an explicit generated mapping table, preserving one-to-many cases where OaSIS is more granular than a unit group.
+| `archive/` | Clearly non-product archival history, not used by the build |
 
 ## Setup
 
@@ -88,13 +87,6 @@ uv run python make_prompt.py
 cd site && python -m http.server 8000
 ```
 
-Optional legacy script:
-
-```bash
-# Experimental OpenRouter-based scoring path kept for comparison only
-uv run python score.py
-```
-
 ## Notes
 
 - The StatCan downloads are cached in `tmp/statcan/`.
@@ -102,6 +94,7 @@ uv run python score.py
 - `pages/` is generated output and can be recreated from `fetch_statcan.py`.
 - The EPIAC mapping is an inference from the closest published StatCan occupation groups to the canonical NOC 2021 spine. Each generated row and page includes a mapping note.
 - OaSIS mappings are explicit rather than inferred: `oasis_profile_mappings.csv` records every attached profile row, and `oasis.json` reports any unmapped or ambiguous profiles.
+- `archive/` is preserved as non-product history and is not imported by the active build or shipped site.
 
 ## Backlog
 

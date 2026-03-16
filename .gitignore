@@ -15,14 +15,12 @@ wheels/
 # Generated markdown summaries
 pages/
 
-# Cached StatCan downloads
-tmp/statcan/
-tmp/noc/
-tmp/oasis/
+# Temporary and cached local artifacts
+tmp/
 
 # Embeddings (unused in final visualization)
 embed.py
 embeddings.json
 
 # macOS
-.DS_Storetmp/
+.DS_Store

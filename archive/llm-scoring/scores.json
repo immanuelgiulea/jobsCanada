@@ -1,0 +1,303 @@
+[
+  {
+    "slug": "noc-14",
+    "title": "Administrative and financial support and supply chain logistics occupations",
+    "noc_code": "14",
+    "exposure": 8,
+    "rationale": "This group is highly exposed because its core functions\u2014data entry, financial record-keeping, and logistics coordination\u2014are fundamentally digital and rule-based. AI and automation are increasingly capable of handling routine administrative tasks, processing financial transactions, and optimizing supply chain schedules, significantly reducing the human labor required for these outputs."
+  },
+  {
+    "slug": "noc-13",
+    "title": "Administrative occupations and transportation logistics occupations",
+    "noc_code": "13",
+    "exposure": 8,
+    "rationale": "This group is highly exposed because its core functions\u2014scheduling, documentation, data entry, and logistics coordination\u2014are fundamentally digital and text-based. AI agents and LLMs are increasingly capable of automating routine administrative workflows and optimizing complex transportation logistics, significantly reducing the human labor required for these digital processing tasks."
+  },
+  {
+    "slug": "noc-12",
+    "title": "Administrative and financial supervisors and specialized administrative occupations",
+    "noc_code": "12",
+    "exposure": 8,
+    "rationale": "This group is highly exposed because its core functions\u2014supervising administrative workflows, financial record-keeping, and specialized documentation\u2014are fundamentally digital and data-driven. AI can significantly automate routine reporting, scheduling, and financial analysis, though a human element remains necessary for complex supervisory decisions and organizational oversight."
+  },
+  {
+    "slug": "noc-111",
+    "title": "Professional occupations in finance",
+    "noc_code": "111",
+    "exposure": 9,
+    "rationale": "This occupation group is highly exposed because its core work products\u2014financial analysis, auditing, investment modeling, and reporting\u2014are fundamentally digital and data-driven. AI can rapidly automate complex quantitative tasks, draft financial documentation, and perform routine compliance checks, significantly increasing productivity and potentially reducing the headcount required for traditional professional roles."
+  },
+  {
+    "slug": "noc-112",
+    "title": "Professional occupations in business",
+    "noc_code": "112",
+    "exposure": 8,
+    "rationale": "This group consists of knowledge-based roles such as human resources, business consultants, and marketing professionals whose work product is almost entirely digital and text-heavy. AI significantly impacts these occupations by automating routine data analysis, drafting communications, and streamlining recruitment or strategic planning processes, leading to high productivity gains and task transformation."
+  },
+  {
+    "slug": "noc-33",
+    "title": "Assisting occupations in support of health services",
+    "noc_code": "33",
+    "exposure": 2,
+    "rationale": "This occupation group primarily involves physical, hands-on care and manual support tasks that require an embodied presence in a healthcare setting. While AI may assist with administrative scheduling or basic patient monitoring, the core work of assisting patients with mobility, hygiene, and clinical support cannot be digitized or automated by current AI technologies."
+  },
+  {
+    "slug": "noc-313",
+    "title": "Nursing and allied health professionals",
+    "noc_code": "313",
+    "exposure": 3,
+    "rationale": "While AI can assist with clinical documentation, diagnostic support, and patient monitoring, the core of nursing involves physical procedures, manual dexterity, and embodied human care that cannot be automated. The high demand for physical presence and complex interpersonal interaction acts as a significant barrier to AI replacement."
+  },
+  {
+    "slug": "noc-32",
+    "title": "Technical occupations in health",
+    "noc_code": "32",
+    "exposure": 4,
+    "rationale": "This group involves a mix of physical clinical procedures and digital diagnostic analysis, such as medical imaging and lab testing. While AI significantly enhances diagnostic accuracy and data processing (high digital exposure), the requirement for physical patient interaction and the operation of specialized medical hardware provides a substantial buffer against full automation."
+  },
+  {
+    "slug": "noc-311",
+    "title": "Health treating and consultation services professionals",
+    "noc_code": "311",
+    "exposure": 5,
+    "rationale": "This group involves a mix of high-level cognitive analysis and physical, hands-on patient care. While AI significantly impacts the digital aspects of the role\u2014such as diagnostics, treatment planning, and medical documentation\u2014the core requirement for physical examinations, manual procedures, and complex interpersonal empathy provides a substantial buffer against full automation."
+  },
+  {
+    "slug": "noc-312",
+    "title": "Therapy and assessment professionals",
+    "noc_code": "312",
+    "exposure": 3,
+    "rationale": "While AI can assist with clinical documentation, diagnostic assessment tools, and personalized treatment planning, the core work requires high-level human empathy, physical presence, and complex interpersonal navigation. The therapeutic relationship and embodied care inherent in these roles provide a significant barrier to AI replacement or substantial automation."
+  },
+  {
+    "slug": "noc-10-20-30-40-50",
+    "title": "Specialized middle management occupations",
+    "noc_code": "10, 20, 30, 40, 50",
+    "exposure": 7,
+    "rationale": "Specialized middle management involves significant digital work including data analysis, reporting, strategic planning, and routine communication, all of which are highly susceptible to AI augmentation. While these roles require human-centric leadership and decision-making, AI can automate a large portion of their administrative oversight and technical coordination tasks, significantly increasing individual productivity and potentially reducing the total number of managers required."
+  },
+  {
+    "slug": "noc-70-80-90",
+    "title": "Middle management occupations in trades, transportation, production and utilities",
+    "noc_code": "70, 80, 90",
+    "exposure": 5,
+    "rationale": "This group involves a mix of digital administrative tasks, such as scheduling and resource planning, which are highly susceptible to AI optimization, and physical site management that requires human presence. While AI can significantly automate the logistical and reporting aspects of middle management, the core requirement for on-site supervision and manual troubleshooting in trades and utilities provides a buffer against full automation."
+  },
+  {
+    "slug": "noc-60",
+    "title": "Middle management occupations in retail and wholesale trade and customer services",
+    "noc_code": "60",
+    "exposure": 5,
+    "rationale": "This group faces moderate exposure because while AI can significantly automate digital tasks like inventory forecasting, scheduling, and performance reporting, the core work still requires physical presence and human-centric management. These managers must handle on-site operational issues, physical stock, and complex interpersonal dynamics with staff and customers that AI cannot yet replicate."
+  },
+  {
+    "slug": "noc-0",
+    "title": "Legislative and senior management occupations",
+    "noc_code": "0",
+    "exposure": 6,
+    "rationale": "While these roles involve high-level decision-making and interpersonal leadership that require human accountability, their core work is heavily digital, involving the analysis of complex reports, policy drafting, and strategic communication. AI significantly enhances their productivity by synthesizing vast amounts of data and automating administrative oversight, though it cannot replace the final legislative or executive authority."
+  },
+  {
+    "slug": "noc-212",
+    "title": "Professional occupations in applied sciences (except engineering)",
+    "noc_code": "212",
+    "exposure": 9,
+    "rationale": "This group includes computer programmers, software engineers, and data scientists whose core work product is entirely digital and code-based. AI is already fundamentally reshaping these roles through automated code generation, debugging, and data analysis, significantly increasing individual productivity and automating routine technical tasks."
+  },
+  {
+    "slug": "noc-22",
+    "title": "Technical occupations related to natural and applied sciences",
+    "noc_code": "22",
+    "exposure": 8,
+    "rationale": "This group consists of highly digital and data-centric roles, including computer programmers, web designers, and technical analysts, whose core work products are code, documentation, and digital models. AI significantly enhances productivity in these areas through automated code generation, data synthesis, and technical troubleshooting, making the group highly susceptible to both task automation and structural shifts in labor demand."
+  },
+  {
+    "slug": "noc-213",
+    "title": "Professional occupations in engineering",
+    "noc_code": "213",
+    "exposure": 7,
+    "rationale": "Engineering is high-level knowledge work where core tasks like design, simulation, and data analysis are performed digitally and are highly susceptible to AI-driven productivity gains. While professional engineers retain critical accountability and some field-based oversight, AI is rapidly automating routine technical calculations, CAD drafting, and complex modeling."
+  },
+  {
+    "slug": "noc-211",
+    "title": "Professional occupations in natural sciences",
+    "noc_code": "211",
+    "exposure": 7,
+    "rationale": "This group involves heavy data analysis, modeling, and technical documentation, all of which are highly susceptible to AI-driven productivity gains. While laboratory work and field research provide a physical buffer, the core professional output is increasingly digital and reliant on computational tools."
+  },
+  {
+    "slug": "noc-84-85",
+    "title": "Workers and labourers in natural resources, agriculture and related production",
+    "noc_code": "84-85",
+    "exposure": 1,
+    "rationale": "This occupation group consists primarily of physical, hands-on labor in outdoor or industrial environments such as farms, mines, and forests. Because the core work involves manual dexterity and physical presence in non-digital settings, it is highly insulated from AI, which cannot perform physical tasks without advanced robotics that fall outside the scope of software-based AI."
+  },
+  {
+    "slug": "noc-82-83",
+    "title": "Supervisors and occupations in natural resources, agriculture and related production",
+    "noc_code": "82-83",
+    "exposure": 3,
+    "rationale": "The core work in natural resources and agriculture is fundamentally physical and tied to specific geographic locations, creating a strong barrier against AI replacement. While AI can optimize yields and resource management through data analysis and precision monitoring, the primary tasks require manual skill, mobility, and the operation of heavy machinery in unpredictable outdoor environments."
+  },
+  {
+    "slug": "noc-54-55",
+    "title": "Support occupations in art, culture and sport",
+    "noc_code": "54-55",
+    "exposure": 6,
+    "rationale": "This group includes many digital-adjacent roles such as graphic arts technicians, photographers, and broadcast assistants whose core work involves digital media processing and content creation. While some roles require physical presence (e.g., stagehands or athletes' support), a significant portion of the work is susceptible to AI-driven automation in editing, layout, and routine media production."
+  },
+  {
+    "slug": "noc-51",
+    "title": "Professional occupations in art and culture",
+    "noc_code": "51",
+    "exposure": 8,
+    "rationale": "This group includes writers, editors, and creative designers whose core work products are digital and heavily susceptible to generative AI tools for content creation and editing. While high-level artistic vision and cultural nuance remain human-centric, the high volume of routine digital production in these roles makes them highly exposed to both productivity gains and displacement."
+  },
+  {
+    "slug": "noc-52",
+    "title": "Technical occupations in art, culture and sport",
+    "noc_code": "52",
+    "exposure": 8,
+    "rationale": "This group includes roles like graphic designers, illustrators, and video editors whose core work product is digital and highly susceptible to generative AI tools. While some sub-sectors involve physical technical work (like stagehands or camera operators), the majority of the group's output involves digital creation, editing, and technical processing that AI is rapidly automating or augmenting."
+  },
+  {
+    "slug": "noc-53",
+    "title": "Occupations in art, culture and sport",
+    "noc_code": "53",
+    "exposure": 7,
+    "rationale": "This group includes many digital-first roles such as graphic designers, illustrators, and technical creative roles that are highly susceptible to generative AI tools for content creation. While the 'sport' and 'performing arts' components provide a physical buffer, a significant portion of the work product in this category is digital, making it highly exposed to AI-driven productivity shifts and task automation."
+  },
+  {
+    "slug": "noc-412",
+    "title": "Professional occupations in education services",
+    "noc_code": "412",
+    "exposure": 7,
+    "rationale": "This group has high exposure because core tasks like lesson planning, content creation, grading, and administrative documentation are fundamentally digital and highly susceptible to AI augmentation. While the physical presence and interpersonal mentorship required in classroom settings provide a buffer, AI is significantly reshaping the pedagogical workflow and productivity of educators."
+  },
+  {
+    "slug": "noc-422",
+    "title": "Paraprofessional occupations in legal, social, community and education services",
+    "noc_code": "422",
+    "exposure": 7,
+    "rationale": "This group includes paralegals and social service workers whose core tasks involve heavy documentation, legal research, and administrative processing, all of which are highly susceptible to AI automation. While the social and community service components require human empathy and physical presence, the legal and educational paraprofessional roles are increasingly reshaped by AI's ability to draft documents and analyze information."
+  },
+  {
+    "slug": "noc-414",
+    "title": "Professional occupations in government services",
+    "noc_code": "414",
+    "exposure": 8,
+    "rationale": "This group consists of knowledge-based roles focused on policy analysis, program administration, and research, which are fundamentally digital and text-heavy. AI can significantly automate core tasks such as data synthesis, report drafting, and regulatory compliance, though high-level political navigation and stakeholder management provide a partial buffer."
+  },
+  {
+    "slug": "noc-413",
+    "title": "Professional occupations in social and community services",
+    "noc_code": "413",
+    "exposure": 4,
+    "rationale": "While these roles involve significant digital documentation and case management that AI can streamline, the core work requires high-stakes interpersonal empathy, complex ethical judgment, and physical community presence. AI serves as a productivity tool for administrative tasks, but it cannot replace the essential human-to-human connection and social intuition required in community services."
+  },
+  {
+    "slug": "noc-43",
+    "title": "Assisting occupations in education and in legal and public protection",
+    "noc_code": "43",
+    "exposure": 5,
+    "rationale": "This group has moderate exposure because it blends digital administrative tasks with essential physical presence and interpersonal support. While AI can significantly automate legal documentation, scheduling, and educational content preparation, the core functions of classroom assistance and public protection require embodied human interaction and real-time physical intervention."
+  },
+  {
+    "slug": "noc-411",
+    "title": "Professional occupations in law",
+    "noc_code": "411",
+    "exposure": 8,
+    "rationale": "Legal work is fundamentally digital and information-based, involving extensive document review, legal research, and drafting which are core strengths of Large Language Models. While high-level advocacy and complex negotiations require human judgment, a significant portion of billable tasks are highly susceptible to AI-driven automation and productivity gains."
+  },
+  {
+    "slug": "noc-421",
+    "title": "Occupations in front-line public protection services",
+    "noc_code": "421",
+    "exposure": 3,
+    "rationale": "This group involves physical presence, emergency response, and hands-on public safety tasks that cannot be automated by AI. While AI will significantly impact administrative reporting, evidence analysis, and surveillance monitoring, the core functions of front-line protection remain embodied and require human judgment in high-stakes, unpredictable environments."
+  },
+  {
+    "slug": "noc-44-45",
+    "title": "Care providers and public protection support occupations and student monitors, crossing guards and related occupations",
+    "noc_code": "44-45",
+    "exposure": 1,
+    "rationale": "The core functions of this group\u2014such as student monitoring, crossing guard duties, and care provision\u2014require physical presence, manual intervention, and real-world sensory awareness. Because these tasks are embodied and occur in the physical environment rather than a digital workspace, AI has minimal capacity to automate or significantly reshape the primary work."
+  },
+  {
+    "slug": "noc-94",
+    "title": "Machine operators, assemblers and inspectors in processing, manufacturing and printing",
+    "noc_code": "94",
+    "exposure": 3,
+    "rationale": "While AI-driven computer vision and predictive maintenance are increasingly used for inspection and machine monitoring, the core work remains physical and tied to the operation of heavy industrial equipment. The requirement for manual assembly, physical presence on a factory floor, and the handling of tangible materials provides a significant barrier to direct AI replacement compared to digital knowledge work."
+  },
+  {
+    "slug": "noc-92-93",
+    "title": "Supervisors, central control and process operators in processing, manufacturing and utilities and aircraft assemblers and inspectors",
+    "noc_code": "92-93",
+    "exposure": 5,
+    "rationale": "This group has moderate exposure because central control and process operators work with digital monitoring systems and data patterns that AI can optimize for predictive maintenance and efficiency. However, supervisors and aircraft assemblers perform physical inspections and manual oversight that require embodied presence and complex tactile problem-solving, creating a significant barrier to full automation."
+  },
+  {
+    "slug": "noc-95",
+    "title": "Labourers in processing, manufacturing and utilities",
+    "noc_code": "95",
+    "exposure": 1,
+    "rationale": "This occupation group consists of manual, physical labor in industrial settings that requires embodied presence and physical manipulation of materials. While robotics and traditional automation impact this sector, the specific capabilities of Generative AI have minimal direct effect on the core hands-on tasks performed by these workers."
+  },
+  {
+    "slug": "noc-65",
+    "title": "Sales and service support occupations",
+    "noc_code": "65",
+    "exposure": 4,
+    "rationale": "This group includes a mix of physical tasks (stocking, cleaning, food prep) and digital/informational tasks (cashiering, basic customer service). While AI and automation are increasingly handling routine transactions and inquiries, the requirement for physical presence and manual labor in many support roles provides a significant buffer against full displacement."
+  },
+  {
+    "slug": "noc-64",
+    "title": "Sales and service representatives and other customer and personal services occupations",
+    "noc_code": "64",
+    "exposure": 7,
+    "rationale": "This group is highly exposed because a significant portion of the work involves routine communication, information retrieval, and digital transactions that are increasingly handled by AI-driven chatbots and automated systems. While some personal service roles require physical presence, the high volume of sales and representative tasks makes the category vulnerable to significant productivity shifts and labor displacement through automation."
+  },
+  {
+    "slug": "noc-63",
+    "title": "Occupations in sales and services",
+    "noc_code": "63",
+    "exposure": 4,
+    "rationale": "This group involves a mix of physical presence and digital interaction, with AI increasingly handling routine customer inquiries, inventory management, and sales lead generation. While core tasks like in-person service and physical sales remain resistant to full automation, AI-driven chatbots and automated checkout systems significantly augment or replace specific administrative and transactional functions."
+  },
+  {
+    "slug": "noc-62",
+    "title": "Retail sales and service supervisors and specialized occupations in sales and services",
+    "noc_code": "62",
+    "exposure": 4,
+    "rationale": "This group involves a mix of digital administrative tasks, such as scheduling and inventory management, which are highly susceptible to AI optimization, and physical on-site supervision. While AI can automate routine reporting and customer service inquiries, the core requirement for physical presence, manual oversight, and face-to-face conflict resolution limits total exposure."
+  },
+  {
+    "slug": "noc-72",
+    "title": "Technical trades and transportation officers and controllers",
+    "noc_code": "72",
+    "exposure": 3,
+    "rationale": "The majority of this group consists of skilled trades and transportation roles that require physical presence and manual dexterity, which are highly resistant to AI. However, the inclusion of 'controllers' (such as air traffic or dispatch) introduces moderate exposure, as AI can significantly enhance route optimization, monitoring, and decision-support tasks."
+  },
+  {
+    "slug": "noc-73",
+    "title": "General trades",
+    "noc_code": "73",
+    "exposure": 1,
+    "rationale": "General trades involve physical, hands-on labor and the operation of heavy equipment in non-routine environments, which provides a strong barrier against AI automation. While AI may assist with administrative scheduling or diagnostic software, the core work requires manual dexterity and physical presence that cannot be replicated by digital systems."
+  },
+  {
+    "slug": "noc-75",
+    "title": "Helpers and labourers and other transport drivers, operators and labourers",
+    "noc_code": "75",
+    "exposure": 1,
+    "rationale": "This occupation group consists primarily of physical, hands-on labor and manual transport tasks that require embodied presence in the physical world. While AI may eventually integrate with robotics or autonomous vehicles, the core work of helpers and laborers remains highly resistant to digital automation compared to knowledge-based roles."
+  },
+  {
+    "slug": "noc-74",
+    "title": "Mail and message distribution, other transport equipment operators and related maintenance workers",
+    "noc_code": "74",
+    "exposure": 2,
+    "rationale": "The core functions of this group involve physical labor, manual equipment operation, and the tangible movement of goods, which AI cannot perform directly. While AI may optimize routing and logistics management, the requirement for physical presence and manual dexterity provides a significant barrier to automation."
+  }
+]

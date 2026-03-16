@@ -2,12 +2,12 @@
 
 This repo uses the official NOC 2021 classification structure as its only occupation taxonomy.
 
-## Migration note
+## Active scope
 
-- The upstream repo organized occupations around a smaller 43-group dashboard model tied to a U.S.-centric taxonomy and data workflow.
-- This fork migrated the project onto the Canadian NOC 2021 classification instead.
-- The Canadian taxonomy change replaced that upstream grouping model with the official NOC 2021 hierarchy: 516 canonical unit groups and 45 official major groups.
-- The current repo treats the NOC 2021 hierarchy as the only active taxonomy in generated outputs and dashboard payloads.
+- The official NOC 2021 hierarchy is the only active taxonomy in generated outputs and dashboard payloads.
+- Canonical occupation IDs are the 516 official unit groups.
+- The primary dashboard roll-up layer is the 45 official major groups.
+- Official OaSIS occupational profiles attach to that canonical spine through an explicit generated mapping table keyed to unit-group code.
 
 ## Canonical structure
 
@@ -19,10 +19,7 @@ This repo uses the official NOC 2021 classification structure as its only occupa
 
 ## Primary dashboard layer
 
-- Canonical occupation IDs are the 516 official NOC 2021 unit groups.
-- The primary dashboard roll-up layer is the 45 official NOC 2021 major groups.
 - Downstream consumers should resolve occupations by canonical NOC code or canonical slug.
-- Official OaSIS occupational profiles attach to that canonical spine through an explicit generated mapping table keyed to the unit-group code.
 
 ## Methodology note
 

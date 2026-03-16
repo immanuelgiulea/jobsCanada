@@ -26,8 +26,8 @@ Conventions:
 6. `[x]` Epic: Replace the remaining legacy U.S. detail/profile layer with latest-official OaSIS data.
    Implemented. `fetch_statcan.py` now resolves the latest official OaSIS package from the Open Canada CKAN API at fetch time, caches the English CSV release under `tmp/oasis/`, writes generated `oasis.json` and `oasis_profile_mappings.csv` artifacts with resolved version/source/fetch metadata, and attaches all 900 OaSIS occupational profiles to the canonical 516-unit-group spine through an explicit mapping table. One-to-many mappings are preserved on the canonical rows, in `site/data.json`, and in the generated markdown pages, while unmapped or ambiguous profiles are surfaced in the OaSIS audit report instead of being dropped.
 
-7. `[ ]` Epic: Remove all remaining U.S.-only product remnants after the OaSIS migration.
-   After item 6, the runtime product, build pipeline, generated artifacts, and user-facing copy should be fully Canadian. Any remaining U.S.-only material should either be deleted or quarantined as clearly non-functional archival history.
+7. `[x]` Epic: Remove all remaining U.S.-only product remnants after the OaSIS migration.
+   Implemented. The active build/runtime/docs now describe only the Canadian StatCan / ESDC / OaSIS pipeline, legacy BLS/OOH and OpenRouter-era materials were moved under `archive/` as clearly non-product history, and the active Python environment no longer declares scraper/scoring-only dependencies.
    Done when:
    - No active build step, generated artifact, route, or UI surface depends on U.S.-only sources such as BLS or O*NET.
    - No user-facing copy, links, labels, tooltips, or documentation in the shipped product references U.S.-only sources or terminology.
