@@ -32,10 +32,10 @@ a{color:inherit}
 canvas#canvas{display:block;position:fixed;top:0;left:var(--sidebar-w);cursor:default}
 #emptyState{display:none;align-items:center;justify-content:center;padding:28px 34px;text-align:center;font-size:14px;line-height:1.6;color:var(--fg2);pointer-events:none;z-index:6}
 #emptyState.visible{display:flex}
-#tooltip{position:fixed;pointer-events:none;max-width:400px;padding:12px 14px;border-radius:14px;background:rgba(15,18,24,.96);border:1px solid rgba(255,255,255,.14);box-shadow:0 18px 40px rgba(0,0,0,.42);opacity:0;transition:opacity .12s ease;z-index:30}#tooltip.visible{opacity:1}
-#tooltip .tt-title{font-size:14px;font-weight:650;color:#fff;margin-bottom:4px}#tooltip .tt-subtitle{font-size:11px;color:var(--fg2);margin-bottom:8px}#tooltip .tt-exposure{font-size:12px;margin-bottom:8px}#tooltip .tt-stats{display:grid;grid-template-columns:auto auto;gap:3px 12px;font-size:12px}#tooltip .tt-stats .label{color:var(--fg2)}#tooltip .tt-stats .value{text-align:right;color:var(--fg)}#tooltip .tt-rationale{margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,.08);font-size:11px;line-height:1.45;color:var(--fg2)}
+#tooltip{position:fixed;pointer-events:none;width:min(400px,calc(100vw - 16px));max-height:calc(100vh - 16px);padding:12px 14px;border-radius:14px;background:rgba(15,18,24,.96);border:1px solid rgba(255,255,255,.14);box-shadow:0 18px 40px rgba(0,0,0,.42);opacity:0;transition:opacity .12s ease;z-index:30;overflow-x:hidden;overflow-y:auto}#tooltip.visible{opacity:1}
+#tooltip .tt-title{font-size:14px;font-weight:650;color:#fff;margin-bottom:4px}#tooltip .tt-subtitle{font-size:11px;line-height:1.4;color:var(--fg2);margin-bottom:8px}#tooltip .tt-exposure{font-size:12px;margin-bottom:8px}#tooltip .tt-stats{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:3px 12px;font-size:12px}#tooltip .tt-stats .label,#tooltip .tt-stats .value{min-width:0}#tooltip .tt-stats .label{color:var(--fg2)}#tooltip .tt-stats .value{justify-self:end;text-align:right;color:var(--fg)}#tooltip .tt-rationale{margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,.08);font-size:11px;line-height:1.5;color:var(--fg2);white-space:normal;overflow-wrap:anywhere;word-break:break-word}#tooltip .tt-rationale[hidden]{display:none}#tooltip .tt-rationale-label{display:block;margin-bottom:4px;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.56)}#tooltip .tt-rationale p+p{margin-top:6px}
 @media (max-width:980px){body{overflow:auto}#sidebar{position:relative;width:100%;bottom:auto;padding:18px 16px;border-right:0;border-bottom:1px solid var(--line);box-shadow:none}.view-toggle{grid-template-columns:1fr}canvas#canvas{position:absolute;left:0;top:0}}
-@media (max-width:560px){#sidebar h1{font-size:16px}.stat-big{font-size:26px}.hbar-label{width:78px}#tooltip{max-width:calc(100vw - 20px)}}
+@media (max-width:560px){#sidebar h1{font-size:16px}.stat-big{font-size:26px}.hbar-label{width:78px}}
 </style>
 </head>
 <body>
@@ -120,6 +120,13 @@ function getProvinceGeos(){return getGeoList().filter(geo=>geo.type==="province"
 function hasOutlookStats(stats){return !!stats&&(stats.outlook_label!=null||stats.outlook_score!=null||stats.outlook_window_start!=null||stats.outlook_window_end!=null||stats.outlook_release_date!=null)}
 function getRenderableData(items){return items.filter(item=>(item.jobs||0)>0)}
 function renderNote(text){return`<div class="chart-note">${escapeHTML(text)}</div>`}
+function normalizeTooltipText(text){return String(text||"").replace(/\s+/g," ").replace(/([.!?]["')\]]?)(?=[A-Z0-9"(])/g,"$1 ").trim()}
+function formatMappingNoteHTML(note){
+  const normalized=normalizeTooltipText(note);
+  if(!normalized)return"";
+  const paragraphs=(normalized.match(/[^.!?]+(?:[.!?]+["')\]]*|$)/g)||[normalized]).map(sentence=>sentence.trim()).filter(Boolean);
+  return`<div class="tt-rationale-label">Mapping note</div>${paragraphs.map(sentence=>`<p>${escapeHTML(sentence)}</p>`).join("")}`;
+}
 function dashboardFamilyLabel(category){return category==="All"?"All dashboard families":`${shortCategoryLabel(category)} dashboard family`}
 function getCategoryHeaderStyle(groupRect){
   if(groupRect.rh>66&&groupRect.rw>110)return{height:FULL_CATEGORY_HEADER,fontSize:10,padding:6,showValue:groupRect.rw>150};
@@ -549,7 +556,11 @@ function showTooltip(item,clientX,clientY){
     tt.querySelector(".tt-exposure").textContent="";
   }
   tt.querySelector(".tt-stats").innerHTML=`<span class="label">Median hourly wage</span><span class="value">${formatMoney(item.pay_hourly)}</span><span class="label">Workers (${jobsYear||"-"})</span><span class="value">${formatCompact(item.jobs)}</span><span class="label">Paid employees</span><span class="value">${formatCompact(item.employees)}</span><span class="label">Employment share</span><span class="value">${formatPercent(item.employment_share_pct)}</span><span class="label">Employment change</span><span class="value">${formatSignedPercent(item.trend_pct)} (${trendLabel})</span><span class="label">Outlook (${outlookStart}-${outlookEnd})</span><span class="value">${item.outlook_label||"Undetermined"}</span><span class="label">Men / Women share</span><span class="value">${formatSharePair(item.men_share_pct,item.women_share_pct)}</span><span class="label">AIOE (${item.epiac_reference_year||meta.exposure_reference_year||"2021"})</span><span class="value">${item.epiac_aioe!=null?item.epiac_aioe.toFixed(2):"-"}</span><span class="label">Complementarity</span><span class="value">${item.epiac_complementarity!=null?item.epiac_complementarity.toFixed(2):"-"}</span><span class="label">HELC / HEHC / Low</span><span class="value">${item.epiac_helc_pct!=null?item.epiac_helc_pct.toFixed(0):"-"} / ${item.epiac_hehc_pct!=null?item.epiac_hehc_pct.toFixed(0):"-"} / ${item.epiac_low_pct!=null?item.epiac_low_pct.toFixed(0):"-"}%</span><span class="label">Unemployment</span><span class="value">${formatPercent(item.unemployment_rate)}</span>`;
-  tt.querySelector(".tt-rationale").textContent=item.exposure_rationale?`Mapping note: ${item.exposure_rationale}`:"";
+  const rationaleEl=tt.querySelector(".tt-rationale");
+  const mappingNoteHtml=formatMappingNoteHTML(item.exposure_rationale);
+  rationaleEl.innerHTML=mappingNoteHtml;
+  rationaleEl.hidden=!mappingNoteHtml;
+  tt.scrollTop=0;
   tt.classList.add("visible");
   tt.style.left="0px";
   tt.style.top="0px";

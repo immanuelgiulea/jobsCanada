@@ -11,8 +11,8 @@
 3. `[x]` Bug: Fix Canada outlook mix semantics and expose provincial dispersion.
    Implemented. The Canada view now separates the Canada-wide aggregate outlook mix from a province-dispersion summary computed from province labels, keeps province-only buckets such as `Very limited` and `Undetermined` visible nationally, and was validated against the generated Canada and Quebec source data.
 
-4. `[ ]` Fix tooltip mapping-note rendering in alternate views.
-   In `Exposure vs Change` and `Exposure vs Outlook`, make the tooltip's mapping note legible with proper spacing, punctuation, and wrapping so the second sentence does not run into the first.
+4. `[x]` Bug: Fix tooltip mapping-note rendering in alternate views.
+   Implemented. The shared dashboard tooltip now normalizes mapping-note sentence spacing, renders multi-sentence notes as readable paragraphs, and constrains wrapping/height so long and weighted-blend notes stay legible without clipping in treemap, `Exposure vs Change`, and `Exposure vs Outlook` on desktop and mobile.
 
 5. `[ ]` Rebuild the occupation model around the official NOC 2021 spine.
    Use the 516 NOC 2021 unit groups as the canonical occupation IDs. Adopt the 45 official major groups as the primary roll-up/dashboard layer, and keep the current 43-group dashboard only as a temporary compatibility concordance during migration.

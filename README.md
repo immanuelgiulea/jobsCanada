@@ -105,8 +105,8 @@ uv run python score.py
 3. `[x]` Fix Canada outlook mix semantics and expose provincial dispersion.
    Implemented in the current repo: the Canada view now separates the Canada-wide aggregate outlook mix from a province-dispersion summary computed from province labels, keeps province-only buckets such as `Very limited` and `Undetermined` visible nationally, and was checked against the generated Canada and Quebec source data.
 
-4. `[ ]` Fix tooltip mapping-note rendering in alternate views.
-   Make the mapping note readable in `Exposure vs Change` and `Exposure vs Outlook`, with proper sentence spacing, punctuation, and wrapping.
+4. `[x]` Fix tooltip mapping-note rendering in alternate views.
+   Implemented in the current repo: the shared dashboard tooltip now normalizes mapping-note sentence spacing, renders multi-sentence notes as separate paragraphs, and keeps long notes readable in `Exposure vs Change` and `Exposure vs Outlook` on desktop and mobile.
 
 5. `[ ]` Rebuild the occupation model around the official NOC 2021 spine.
    Use the 516 unit groups as canonical IDs, adopt the 45 official major groups as the primary dashboard roll-up layer, and keep the current 43-group model only as a temporary compatibility layer.
