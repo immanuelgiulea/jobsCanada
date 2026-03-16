@@ -67,7 +67,7 @@ canvas#canvas{display:block;position:fixed;top:0;left:var(--sidebar-w);cursor:de
   <div class="stat-section"><h3>Workers by high-exp. share</h3><div class="histogram" id="histogram"></div><div class="hist-labels"><span>0%</span><span>50%</span><span>100%</span></div></div>
   <div class="stat-section"><h3>EPIAC mix</h3><div class="tier-bar" id="tierBar"></div></div>
   <div class="stat-section"><h3>High-exp. share by hourly pay</h3><div class="hbar-chart" id="payChart"></div></div>
-  <div class="stat-section"><h3>High-exp. share by family</h3><div class="hbar-chart" id="familyChart"></div></div>
+  <div class="stat-section"><h3>High-exp. share by dashboard family</h3><div class="hbar-chart" id="familyChart"></div></div>
   <div class="stat-section"><h3>Estimated high-exp. workers</h3><div class="stat-big" id="statHighExposure">-</div><div class="stat-label" id="statHighExposureDesc">Workers mapped to high-exposure EPIAC occupations</div></div>
   <div class="stat-section"><h3>2025-2027 outlook mix</h3><div class="tier-bar" id="outlookMix"></div></div>
   <div class="gradient-legend"><span id="legendStart">Low</span><canvas id="gradientLegend" width="80" height="8"></canvas><span id="legendEnd">High</span></div>
@@ -92,7 +92,7 @@ const VIEW_INFO={
 const OUTLOOK_LABELS=["Very good","Good","Moderate","Limited","Very limited","Undetermined"];
 const OUTLOOK_LABEL_TO_SCORE={"Very good":2,"Good":1,"Moderate":0,"Limited":-1,"Very limited":-2};
 const categoryShort={"Management occupations":"Mgmt","Business, finance and administration occupations, except management":"Bus/Admin","Natural and applied sciences and related occupations, except management":"STEM","Health occupations, except management":"Health","Occupations in education, law and social, community and government services, except management":"Edu/Law","Occupations in art, culture, recreation and sport, except management":"Arts","Sales and service occupations, except management":"Sales","Trades, transport and equipment operators and related occupations, except management":"Trades","Natural resources, agriculture and related production occupations, except management":"Resources","Occupations in manufacturing and utilities, except management":"Mfg/Util"};
-const MOBILE_BREAKPOINT=980,MIN_CANVAS_HEIGHT=560,MARGIN=14,GAP=2,CATEGORY_HEADER=18;
+const MOBILE_BREAKPOINT=980,MIN_CANVAS_HEIGHT=560,MARGIN=14,GAP=2,FULL_CATEGORY_HEADER=18,COMPACT_CATEGORY_HEADER=14;
 
 let meta={},geoLookup={},sourceData=[],allData=[],data=[],rects=[],trendRects=[],outlookRects=[],categoryRects=[],hovered=null,currentView="treemap",activeCategory="All",selectedGeo="CA",dpr=window.devicePixelRatio||1;
 const sidebar=document.getElementById("sidebar"),canvas=document.getElementById("canvas"),ctx=canvas.getContext("2d");
@@ -116,6 +116,12 @@ function getGeoMeta(code){return geoLookup[code]||geoLookup[meta.default_geograp
 function getGeoLabel(code){return getGeoMeta(code).label_en||code}
 function getRenderableData(items){return items.filter(item=>(item.jobs||0)>0)}
 function renderNote(text){return`<div class="chart-note">${escapeHTML(text)}</div>`}
+function dashboardFamilyLabel(category){return category==="All"?"All dashboard families":`${shortCategoryLabel(category)} dashboard family`}
+function getCategoryHeaderStyle(groupRect){
+  if(groupRect.rh>66&&groupRect.rw>110)return{height:FULL_CATEGORY_HEADER,fontSize:10,padding:6,showValue:groupRect.rw>150};
+  if(groupRect.rh>30&&groupRect.rw>58)return{height:COMPACT_CATEGORY_HEADER,fontSize:9,padding:5,showValue:false};
+  return{height:0,fontSize:9,padding:0,showValue:false};
+}
 
 function resolveOccupation(item,geoCode){
   const stats=item.stats_by_geo&&item.stats_by_geo[geoCode]?item.stats_by_geo[geoCode]:{};
@@ -160,7 +166,7 @@ function populateGeographySelect(){
 
 function populateCategoryChips(){
   const root=document.getElementById("categoryChips");
-  const options=[{category:"All",label:"All families",jobs:totalJobs(allData)},...getCategoryGroups(allData)];
+  const options=[{category:"All",label:"All dashboard families",jobs:totalJobs(allData)},...getCategoryGroups(allData)];
   root.innerHTML=options.map(option=>`<button type="button" class="category-chip${option.category===activeCategory?" active":""}" data-category="${escapeHTML(option.category)}"><span>${escapeHTML(option.label)}</span><span class="chip-metric">${formatCompact(option.jobs)}</span></button>`).join("");
   root.querySelectorAll(".category-chip").forEach(button=>button.addEventListener("click",()=>setCategory(button.dataset.category||"All")));
 }
@@ -268,9 +274,9 @@ function layoutTreemap(){
   const groups=getCategoryGroups(renderable).filter(group=>group.jobs>0).map(group=>({category:group.category,label:group.label,value:group.jobs,items:renderable.filter(item=>item.category===group.category).sort((a,b)=>(b.jobs||0)-(a.jobs||0))}));
   if(!groups.length)return;
   for(const groupRect of squarify(groups,tx,ty,tw,th)){
-    const headerHeight=groupRect.rh>66&&groupRect.rw>110?CATEGORY_HEADER:0;
-    categoryRects.push({...groupRect,headerHeight});
-    const innerX=groupRect.rx+GAP,innerY=groupRect.ry+GAP+headerHeight,innerW=groupRect.rw-GAP*2,innerH=groupRect.rh-GAP*2-headerHeight;
+    const headerStyle=getCategoryHeaderStyle(groupRect);
+    categoryRects.push({...groupRect,headerHeight:headerStyle.height,headerFontSize:headerStyle.fontSize,headerPadding:headerStyle.padding,headerShowValue:headerStyle.showValue});
+    const innerX=groupRect.rx+GAP,innerY=groupRect.ry+GAP+headerStyle.height,innerW=groupRect.rw-GAP*2,innerH=groupRect.rh-GAP*2-headerStyle.height;
     if(innerW<=0||innerH<=0)continue;
     rects.push(...squarify(groupRect.items.map(item=>({...item,value:item.jobs||1})),innerX,innerY,innerW,innerH));
   }
@@ -289,14 +295,16 @@ function drawCategoryFrames(){
       gradient.addColorStop(1,"rgba(255,255,255,.02)");
       ctx.fillStyle=gradient;
       ctx.fillRect(groupRect.rx+1,groupRect.ry+1,groupRect.rw-2,groupRect.headerHeight);
-      ctx.font="600 10px -apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif";
+      ctx.font=`600 ${groupRect.headerFontSize}px -apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif`;
       ctx.textBaseline="middle";
       ctx.textAlign="left";
       ctx.fillStyle="rgba(255,255,255,.62)";
-      ctx.fillText(groupRect.label,groupRect.rx+6,groupRect.ry+groupRect.headerHeight/2+1);
-      if(groupRect.rw>150){
+      const reservedValueWidth=groupRect.headerShowValue?42:0;
+      const labelWidth=Math.max(0,groupRect.rw-groupRect.headerPadding*2-reservedValueWidth);
+      ctx.fillText(fitText(groupRect.label,labelWidth),groupRect.rx+groupRect.headerPadding,groupRect.ry+groupRect.headerHeight/2+1);
+      if(groupRect.headerShowValue){
         ctx.textAlign="right";
-        ctx.fillText(formatCompact(groupRect.value),groupRect.rx+groupRect.rw-6,groupRect.ry+groupRect.headerHeight/2+1);
+        ctx.fillText(formatCompact(groupRect.value),groupRect.rx+groupRect.rw-groupRect.headerPadding,groupRect.ry+groupRect.headerHeight/2+1);
       }
     }
   }
@@ -527,7 +535,7 @@ function showTooltip(item,clientX,clientY){
   const outlookStart=item.outlook_window_start??findMetricValue(allData,"outlook_window_start")??meta.outlook_window_start??2025;
   const outlookEnd=item.outlook_window_end??findMetricValue(allData,"outlook_window_end")??meta.outlook_window_end??2027;
   tt.querySelector(".tt-title").textContent=item.title;
-  tt.querySelector(".tt-subtitle").textContent=`${shortCategoryLabel(item.category)} family | NOC ${item.noc_code} | ${geoLabel}`;
+  tt.querySelector(".tt-subtitle").textContent=`${shortCategoryLabel(item.category)} dashboard family | NOC ${item.noc_code} | ${geoLabel}`;
   if(item.epiac_high_exposure_pct!=null){
     const width=Math.max(0,Math.min(100,item.epiac_high_exposure_pct));
     const color=exposureColorCSS((item.epiac_high_exposure_pct||0)/10,1);
@@ -648,7 +656,7 @@ function computeStats(){
     document.getElementById("statTotalJobsDesc").textContent=`No employment counts are available for ${shortCategoryLabel(activeCategory)} in ${geoLabel}.`;
     document.getElementById("statAvgExposure").textContent="-";
     document.getElementById("statHighExposure").textContent="-";
-    document.getElementById("statHighExposureDesc").textContent=`No visible employment weights are available for the selected family in ${geoLabel}.`;
+    document.getElementById("statHighExposureDesc").textContent=`No visible employment weights are available for the selected dashboard family in ${geoLabel}.`;
     renderHistogram(new Array(11).fill(0));
     renderTierBar([]);
     renderPayChart([]);
@@ -669,8 +677,8 @@ function computeStats(){
 
   document.getElementById("statTotalJobs").textContent=formatCompact(visibleJobs);
   document.getElementById("statTotalJobsDesc").textContent=activeCategory==="All"
-    ?(jobsYear?`All families in ${geoLabel}, ${jobsYear}`:`All families in ${geoLabel}`)
-    :`${shortCategoryLabel(activeCategory)} family, ${geoJobs>0?(visibleJobs/geoJobs*100).toFixed(1):"0.0"}% of ${geoLabel}`;
+    ?(jobsYear?`All dashboard families in ${geoLabel}, ${jobsYear}`:`All dashboard families in ${geoLabel}`)
+    :`${shortCategoryLabel(activeCategory)} dashboard family, ${geoJobs>0?(visibleJobs/geoJobs*100).toFixed(1):"0.0"}% of ${geoLabel}`;
   document.getElementById("statAvgExposure").innerHTML=`<span style="color:${exposureColorCSS(weightedHighShare/10,1)}">${weightedHighShare.toFixed(0)}%</span>`;
   renderHistogram(histogram);
   renderTierBar(data);
@@ -702,15 +710,16 @@ function updateSubtitle(){
   const outlookStart=findMetricValue(allData,"outlook_window_start")??meta.outlook_window_start??"2025";
   const outlookEnd=findMetricValue(allData,"outlook_window_end")??meta.outlook_window_end??"2027";
   const exposureYear=meta.exposure_reference_year||findMetricValue(sourceData,"epiac_reference_year")||"2021";
-  const visibleCount=data.length,totalCount=meta.occupation_count||allData.length||visibleCount,filterLabel=activeCategory==="All"?"All families":shortCategoryLabel(activeCategory),viewInfo=VIEW_INFO[currentView];
+  const visibleCount=data.length,totalCount=meta.occupation_count||allData.length||visibleCount,filterLabel=dashboardFamilyLabel(activeCategory),viewInfo=VIEW_INFO[currentView];
   const geo=getGeoMeta(selectedGeo);
   const hasGeoJobs=hasJobsData(allData);
+  const familyModelNote=meta.dashboard_hierarchy&&meta.dashboard_hierarchy.family_model_note?meta.dashboard_hierarchy.family_model_note:"";
   const geoLine=hasGeoJobs
     ?`${geo.label_en}${jobsYear?`, ${jobsYear}`:""} annual data from <a href="https://www150.statcan.gc.ca/t1/tbl1/en/tv.action?pid=1410041601" target="_blank" rel="noopener">StatCan</a>`
     :geo.type==="territory"
     ?`${geo.label_en} is included in the selector, but the current StatCan occupation tables exclude the territories`
     :`${geo.label_en} has no current StatCan occupation labour-market data`;
-  subtitle.innerHTML=`${visibleCount} of ${totalCount} NOC occupation groups shown | area = employment | ${viewInfo.colorLine}<br>Filter: ${escapeHTML(filterLabel)} | ${geoLine}<br>Exposure uses mapped StatCan EPIAC estimates from ${exposureYear} Census occupations | outlook uses ESDC ${outlookStart}-${outlookEnd} | <a href="https://karpathy.ai/jobs/" target="_blank" rel="noopener">upstream inspiration</a>`;
+  subtitle.innerHTML=`${visibleCount} of ${totalCount} dashboard occupation groups shown | ${meta.dashboard_family_count||10} dashboard families | area = employment | ${viewInfo.colorLine}<br>Filter: ${escapeHTML(filterLabel)} | ${geoLine}<br>${familyModelNote?`${escapeHTML(familyModelNote)} | `:""}Exposure uses mapped StatCan EPIAC estimates from ${exposureYear} Census occupations | outlook uses ESDC ${outlookStart}-${outlookEnd} | <a href="https://karpathy.ai/jobs/" target="_blank" rel="noopener">upstream inspiration</a>`;
 }
 
 function updateEmptyState(){
@@ -722,7 +731,7 @@ function updateEmptyState(){
     return;
   }
   if(geo.type==="territory")emptyState.textContent=`StatCan's occupation labour-force tables exclude the territories, so ${geo.label_en} has no employment counts for this dashboard. Outlook metadata remains available where ESDC publishes it, but missing labour-market values stay unavailable.`;
-  else if(activeCategory!=="All")emptyState.textContent=`No employment counts are available for the ${shortCategoryLabel(activeCategory)} family in ${geo.label_en}.`;
+  else if(activeCategory!=="All")emptyState.textContent=`No employment counts are available for the ${shortCategoryLabel(activeCategory)} dashboard family in ${geo.label_en}.`;
   else emptyState.textContent=`No employment counts are available for ${geo.label_en}.`;
   emptyState.classList.add("visible");
 }

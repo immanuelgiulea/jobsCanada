@@ -133,6 +133,21 @@ def province_total_rows(workbook_path: Path) -> list[dict[str, str]]:
     return rows
 
 
+def load_unit_group_catalog(workbook_path: Path | None = None) -> dict[str, str]:
+    workbook_path = workbook_path or ensure_outlook_workbook()
+    catalog: dict[str, str] = {}
+    for row in province_total_rows(workbook_path):
+        code = row.get("NOC_Code", "").replace("NOC_", "")
+        title = row.get("NOC Title", "").strip()
+        if not code:
+            continue
+        if code not in catalog:
+            catalog[code] = title
+    if not catalog:
+        raise ValueError("No NOC 2021 unit groups were found in the outlook workbook")
+    return dict(sorted(catalog.items()))
+
+
 def label_from_score(score: float | None) -> str:
     if score is None:
         return "Undetermined"

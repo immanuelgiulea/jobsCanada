@@ -13,6 +13,7 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
+from dashboard_noc_audit import build_dashboard_noc_audit
 from geography import DEFAULT_GEO_CODE, GEO_METADATA
 
 
@@ -78,15 +79,29 @@ def main():
     epiac_reference_year = max(int(row["epiac_reference_year"]) for row in rows if row.get("epiac_reference_year"))
     epiac_source_url = next((row["epiac_source_url"] for row in rows if row.get("epiac_source_url")), STATCAN_EPIAC_URL)
     epiac_source_title = next((row["epiac_source_title"] for row in rows if row.get("epiac_source_title")), STATCAN_EPIAC_TITLE)
+    dashboard_audit = build_dashboard_noc_audit()
+    audit_groups_by_code = {
+        item["dashboard_group_code"]: item for item in dashboard_audit["dashboard"]["groups"]
+    }
 
     occupations = []
     for row in rows:
+        group_audit = audit_groups_by_code[row["noc_code"]]
         occupations.append(
             {
                 "title": row["title"],
                 "slug": row["slug"],
                 "category": row["category"],
+                "dashboard_family_code": group_audit["dashboard_family_variant_section_code"],
                 "noc_code": row["noc_code"],
+                "dashboard_mapping_kind": group_audit["mapping_kind"],
+                "dashboard_mapping_kind_label": group_audit["mapping_kind_label"],
+                "official_broad_category_codes": group_audit["official_broad_category_codes"],
+                "official_broad_category_labels": group_audit["official_broad_category_titles"],
+                "official_major_group_count": group_audit["official_major_group_count"],
+                "official_sub_major_group_count": group_audit["official_sub_major_group_count"],
+                "official_minor_group_count": group_audit["official_minor_group_count"],
+                "official_unit_group_count": group_audit["official_unit_group_count"],
                 "jobs": as_int(row["num_jobs"]),
                 "jobs_year": as_int(row["data_year"]),
                 "trend_pct": as_float(row["employment_change_pct"]),
@@ -136,11 +151,18 @@ def main():
             "default_geography": DEFAULT_GEO_CODE,
             "geographies": GEO_METADATA,
             "occupation_count": len(occupations),
+            "dashboard_family_count": dashboard_audit["dashboard"]["dashboard_family_count"],
             "jobs_year": jobs_year,
             "trend_from_year": trend_from_year,
             "outlook_window_start": outlook_start,
             "outlook_window_end": outlook_end,
             "outlook_release_date": outlook_release_date or None,
+            "official_noc_2021_hierarchy": dashboard_audit["official_hierarchy"],
+            "dashboard_hierarchy": {
+                key: value
+                for key, value in dashboard_audit["dashboard"].items()
+                if key != "groups"
+            },
             "exposure_reference_year": epiac_reference_year,
             "exposure_metric": "StatCan EPIAC high-exposure share",
             "exposure_metric_scale": "0-10 display score derived from the share of workers in high-exposure EPIAC occupations",

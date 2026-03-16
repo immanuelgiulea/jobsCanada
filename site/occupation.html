@@ -89,13 +89,15 @@ fetch("data.json").then(response=>{if(!response.ok)throw new Error(`HTTP ${respo
   const groupLabel=occupation.epiac_group_label||"EPIAC group unavailable";
   const outlookLabel=occupation.outlook_label||"Undetermined";
   const rationale=occupation.exposure_rationale||"No mapping note available.";
+  const officialBroadCategories=(occupation.official_broad_category_codes||[]).map((code,index)=>`${code} ${occupation.official_broad_category_labels&&occupation.official_broad_category_labels[index]?occupation.official_broad_category_labels[index]:""}`.trim()).join("; ");
+  const hierarchyCoverage=`${occupation.official_major_group_count||0} major | ${occupation.official_sub_major_group_count||0} sub-major | ${occupation.official_minor_group_count||0} minor | ${occupation.official_unit_group_count||0} unit`;
   document.getElementById("app").outerHTML=`
     <div class="layout">
       <div class="top-grid">
         <section class="hero">
           <div class="eyebrow">NOC ${escapeHTML(occupation.noc_code)} / Canada / ${jobsYear}</div>
           <h1>${escapeHTML(occupation.title)}</h1>
-          <div class="summary">${escapeHTML(occupation.category)}. This detail page combines annual ${jobsYear} StatCan labour-market data, the mapped official StatCan EPIAC exposure fields, and the aggregated ESDC outlook for ${outlookWindow}.</div>
+          <div class="summary">${escapeHTML(occupation.category)} (${escapeHTML(occupation.dashboard_family_code||"")}). This dashboard group is ${escapeHTML((occupation.dashboard_mapping_kind_label||"a custom concordance").toLowerCase())} spanning ${formatCompact(occupation.official_unit_group_count)} official NOC 2021 unit groups. This detail page combines annual ${jobsYear} StatCan labour-market data, the mapped official StatCan EPIAC exposure fields, and the aggregated ESDC outlook for ${outlookWindow}.</div>
           <div class="meta-row">
             <span class="pill">${formatCompact(occupation.jobs)} employed (${jobsYear} annual avg.)</span>
             <span class="pill">${formatMoney(occupation.pay_hourly)} median hourly wage</span>
@@ -163,7 +165,11 @@ fetch("data.json").then(response=>{if(!response.ok)throw new Error(`HTTP ${respo
         <section class="panel">
           <h2>Occupation Profile</h2>
           <dl class="table">
-            <dt>Occupation family</dt><dd>${escapeHTML(occupation.category)}</dd>
+            <dt>Dashboard family</dt><dd>${escapeHTML(occupation.category)}</dd>
+            <dt>Variant section</dt><dd>${escapeHTML(occupation.dashboard_family_code||"-")}</dd>
+            <dt>NOC mapping</dt><dd>${escapeHTML(occupation.dashboard_mapping_kind_label||"-")}</dd>
+            <dt>Official broad categories</dt><dd>${escapeHTML(officialBroadCategories||"-")}</dd>
+            <dt>Official coverage</dt><dd>${escapeHTML(hierarchyCoverage)}</dd>
             <dt>Employed (${jobsYear} annual avg.)</dt><dd>${formatCompact(occupation.jobs)}</dd>
             <dt>Paid employees (${jobsYear} annual avg.)</dt><dd>${formatCompact(occupation.employees)}</dd>
             <dt>Employment share (${jobsYear})</dt><dd>${formatPercent(occupation.employment_share_pct)}</dd>

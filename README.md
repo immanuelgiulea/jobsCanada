@@ -39,8 +39,10 @@ Context studies using the same framework:
 | `occupations.json` | Canadian occupation-group index with NOC codes and EPIAC mapping summary |
 | `occupations.csv` | Employment, wages, outlooks, and official EPIAC fields |
 | `prompt.md` | Single-file markdown summary of the Canadian dataset |
+| `docs/dashboard-to-noc-2021.md` | Audit of how the 43-group dashboard partitions the official NOC 2021 hierarchy |
 | `pages/` | Generated occupation summaries and source notes |
 | `site/` | Static website |
+| `dashboard_noc_audit.py` | Reproducible dashboard-to-NOC concordance and markdown audit generator |
 | `epiac_data.py` | Official EPIAC source rows and mapping logic |
 | `outlook_data.py` | ESDC outlook ingestion and aggregation logic |
 | `score.py` | Optional legacy LLM scoring script, not used by the site build |
@@ -97,26 +99,44 @@ uv run python score.py
 1. `[x]` Add full geography mode to the current 43-group dashboard.
    Implemented in the current repo: the fetch/build pipeline now emits `stats_by_geo`, the site includes a geography selector, and the dashboard switches labour-market metrics and outlook by geography while keeping EPIAC national.
 
-2. `[ ]` Replace the remaining legacy U.S. detail/profile layer with latest-official OaSIS data.
-   Add an importer that discovers the latest official OaSIS version at fetch time, records the resolved version in generated metadata, and maps OaSIS unit groups and occupational profiles onto the existing 43 dashboard groups.
+2. `[x]` Validate the dashboard-to-NOC mapping against the official NOC 2021 hierarchy.
+   Implemented. The repo now generates [`docs/dashboard-to-noc-2021.md`](docs/dashboard-to-noc-2021.md), exposes hierarchy metadata in `site/data.json`, confirms that the 43 dashboard groups partition all 516 official unit groups with no gaps or overlaps, distinguishes the dashboard's labour-force-variant families from the official broad categories, and keeps small treemap families such as Resources visibly labelled.
 
-3. `[ ]` Add family pages for each dashboard occupation group.
-   Clicking a dashboard group should open a dedicated family page for that group and the selected geography, showing the labour-market summary, matching NOC unit groups, and nested OaSIS occupational profiles inside that family.
+3. `[ ]` Fix Canada outlook mix semantics and expose provincial dispersion.
+   Keep the national aggregate outlook logic, but also surface provincial bucket dispersion so labels such as `Very limited` and `Undetermined` are visible nationally when they appear in provinces.
 
-4. `[ ]` Add global NOC search and deep linking.
-   Add one search input that matches dashboard group codes, unit-group codes, occupational profile codes, titles, and aliases, and route exact hits to the correct family page and focused result.
+4. `[ ]` Fix tooltip mapping-note rendering in alternate views.
+   Make the mapping note readable in `Exposure vs Change` and `Exposure vs Outlook`, with proper sentence spacing, punctuation, and wrapping.
 
-5. `[ ]` Map the 44 occupations from GDPval onto the dashboard.
-   Only ship a direct mapping if the correspondence to the current 43 dashboard groups is explicit and auditable; otherwise present GDPval in a separate comparison view at its own grain.
+5. `[ ]` Rebuild the occupation model around the official NOC 2021 spine.
+   Use the 516 unit groups as canonical IDs, adopt the 45 official major groups as the primary dashboard roll-up layer, and keep the current 43-group model only as a temporary compatibility layer.
 
-6. `[ ]` Add task-level exposure estimates from Eloundou et al. (2023).
-   Evaluate whether the paper's task-speedup framework should attach to OaSIS tasks/profiles or stay in a separate research layer, while preserving the original methodological framing.
+6. `[ ]` Replace the remaining legacy U.S. detail/profile layer with latest-official OaSIS data.
+   Add an importer that resolves the latest official OaSIS version at fetch time and attaches OaSIS profiles to the canonical occupation spine, including one-to-many mappings where OaSIS is more granular.
 
-7. `[ ]` Add a view for academic research overlays.
-   Create a dedicated research view that can compare or summarize academic measures such as AIOE, task-level exposure, and other defensible research inputs without overloading the main dashboard view.
+7. `[ ]` Add family pages for each dashboard occupation group.
+   Build dedicated family pages for the dashboard roll-up groups, showing labour-market summary, underlying NOC unit groups, and nested OaSIS occupational profiles.
 
-8. `[ ]` Add a view for industry research overlays.
-   Create a separate industry research view so private-sector methodologies can be shown alongside, but not conflated with, the official StatCan/ESDC pipeline and academic measures.
+8. `[ ]` Add global NOC search and deep linking.
+   Add one search input that matches major-group codes, unit-group codes, occupational profile codes, titles, and aliases, and route exact hits to the correct family page and focused result.
 
-9. `[ ]` Add EN/FR language switching last.
-   Implement the bilingual toggle only after the data model, routes, labels, and research views stabilize, covering dashboard copy, family/profile pages, navigation, search labels, and research-view text.
+9. `[ ]` Map the 44 occupations from GDPval onto the dashboard.
+   Only ship a direct mapping if the correspondence to the canonical occupation spine is explicit and auditable; otherwise present GDPval in a separate comparison view at its own grain.
+
+10. `[ ]` Add task-level exposure estimates from Eloundou et al. (2023).
+   Attach this framework only where a strict auditable crosswalk exists; otherwise keep it in a separate research layer while preserving the original methodological framing.
+
+11. `[ ]` Add a view for academic research overlays.
+   Create a dedicated research view for academic measures such as AIOE, task-level exposure, GDPval, and related defensible inputs.
+
+12. `[ ]` Add a view for industry research overlays.
+   Create a separate industry research view so private-sector methodologies can be shown alongside, but not conflated with, official or academic measures.
+
+13. `[ ]` Add a benchmark engine at the task-family level.
+   Introduce benchmark data keyed to the canonical occupation spine so measured benchmark performance can be stored and compared with clear provenance.
+
+14. `[ ]` Add a NOC + OaSIS workbench/dashboard surface.
+   Build a workbench view that can show exposure, measured benchmark performance, occupation similarity, and model recommendations on top of the canonical spine and benchmark engine.
+
+15. `[ ]` Add EN/FR language switching last.
+   Implement the bilingual toggle only after the data model, routes, labels, research views, benchmark engine, and workbench surface stabilize.
