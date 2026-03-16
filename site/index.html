@@ -37,6 +37,7 @@ canvas#canvas{display:block;position:fixed;top:0;left:var(--sidebar-w);cursor:de
 @media (max-width:980px){body{overflow:auto}#sidebar{position:relative;width:100%;bottom:auto;padding:18px 16px;border-right:0;border-bottom:1px solid var(--line);box-shadow:none}.view-toggle{grid-template-columns:1fr}canvas#canvas{position:absolute;left:0;top:0}}
 @media (max-width:560px){#sidebar h1{font-size:16px}.stat-big{font-size:26px}.hbar-label{width:78px}}
 </style>
+<link rel="stylesheet" href="./global-search.css">
 </head>
 <body>
 <div id="sidebar">
@@ -51,6 +52,9 @@ canvas#canvas{display:block;position:fixed;top:0;left:var(--sidebar-w);cursor:de
       <select id="geographySelect" aria-label="Select geography"></select>
     </label>
     <div class="control-copy" id="geographyCopy">Labour-market metrics switch by geography. EPIAC stays national and only the employment weights change.</div>
+  </div>
+  <div class="control-stack">
+    <div id="globalSearchMount"></div>
   </div>
   <div class="control-stack">
     <div class="control-title">View</div>
@@ -76,6 +80,7 @@ canvas#canvas{display:block;position:fixed;top:0;left:var(--sidebar-w);cursor:de
 <canvas id="canvas"></canvas>
 <div id="emptyState"></div>
 <div id="tooltip"><div class="tt-title"></div><div class="tt-subtitle"></div><div class="tt-exposure"></div><div class="tt-stats"></div><div class="tt-rationale"></div></div>
+<script src="./global-search.js"></script>
 <script>
 function exposureColor(score){if(score==null)return[128,128,128];const t=Math.max(0,Math.min(10,score))/10;let r,g,b;if(t<.5){const s=t/.5;r=Math.round(50+s*180);g=Math.round(160-s*10);b=Math.round(50-s*20)}else{const s=(t-.5)/.5;r=Math.round(230+s*25);g=Math.round(150-s*110);b=Math.round(30-s*10)}return[r,g,b]}
 function exposureColorCSS(score,alpha){const[r,g,b]=exposureColor(score);return`rgba(${r},${g},${b},${alpha})`}
@@ -537,6 +542,7 @@ function familyPageURL(item){
   if(!route)return null;
   const params=new URLSearchParams();
   if(selectedGeo!==(meta.default_geography||"CA"))params.set("geo",selectedGeo);
+  if(currentView!=="treemap")params.set("view",currentView);
   const search=params.toString();
   return`${route}${search?`?${search}`:""}`;
 }
@@ -858,6 +864,17 @@ fetch("data.json").then(response=>{
   updateSubtitle();
   computeStats();
   drawLegend();
+  if(window.initGlobalNocSearch){
+    window.initGlobalNocSearch({
+      mount: document.getElementById("globalSearchMount"),
+      variant: "default",
+      searchIndexUrl: meta.search_index_route||"search-index.json",
+      getNavigationState: ()=>({
+        geo: selectedGeo!==(meta.default_geography||"CA")?selectedGeo:"",
+        view: currentView!=="treemap"?currentView:"",
+      }),
+    });
+  }
   resize();
 }).catch(error=>{
   console.error(error);

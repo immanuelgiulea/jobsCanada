@@ -42,7 +42,7 @@ Conventions:
    - Existing `occupation.html?slug=...` links redirect successfully to the new family page.
    - Family pages are usable on both desktop and mobile layouts.
 
-9. `[ ]` Epic: Add global NOC search and deep linking.
+9. `[x]` Epic: Add global NOC search and deep linking.
    Add one search input that matches major-group codes, unit-group codes, occupational profile codes, titles, and aliases. Exact code hits should open the correct family page and focus the matching unit group or profile. Build a compact search index rather than pushing full OaSIS profile payloads into the main dashboard JSON.
    Done when:
    - Search indexes major-group codes, unit-group codes, OaSIS profile codes, titles, and aliases.

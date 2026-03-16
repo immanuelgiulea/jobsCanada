@@ -1,4 +1,5 @@
 const EMBEDDED_FAMILY_SLUG = typeof window.__FAMILY_SLUG__ === "string" ? window.__FAMILY_SLUG__ : "";
+const DASHBOARD_VIEWS = new Set(["treemap","trend","outlook"]);
 
 let meta = {};
 let family = null;
@@ -6,6 +7,7 @@ let geoLookup = {};
 let selectedGeo = "CA";
 let openUnits = new Set();
 let openProfiles = new Set();
+let searchController = null;
 
 function formatCompact(value){
   if(value==null)return"-";
@@ -47,6 +49,11 @@ function resolveSelectedGeo(){
   return geoLookup[requested]?requested:(meta.default_geography||"CA");
 }
 
+function resolveDashboardView(){
+  const requested=String(new URLSearchParams(window.location.search).get("view")||"").trim();
+  return DASHBOARD_VIEWS.has(requested)?requested:"";
+}
+
 function resolveStats(item){
   return item&&item.stats_by_geo&&item.stats_by_geo[selectedGeo]?item.stats_by_geo[selectedGeo]:{};
 }
@@ -75,6 +82,8 @@ function updateBackLink(){
   if(!backLink)return;
   const params=new URLSearchParams();
   if(selectedGeo!==(meta.default_geography||"CA"))params.set("geo",selectedGeo);
+  const dashboardView=resolveDashboardView();
+  if(dashboardView&&dashboardView!=="treemap")params.set("view",dashboardView);
   backLink.href=`./${params.toString()?`?${params.toString()}`:""}`;
 }
 
@@ -411,6 +420,19 @@ function loadFamilyPage(){
     family.units=Array.isArray(family.units)?family.units:[];
     geoLookup=Object.fromEntries(getGeoList().map(geo=>[geo.code,geo]));
     selectedGeo=resolveSelectedGeo();
+    if(!searchController&&window.initGlobalNocSearch){
+      searchController=window.initGlobalNocSearch({
+        mount: document.getElementById("globalSearchMount"),
+        variant: "nav",
+        searchIndexUrl: meta.search_index_route||"search-index.json",
+        placeholder: "Search codes, titles, or aliases",
+        helperText: "",
+        getNavigationState: ()=>({
+          geo: selectedGeo!==(meta.default_geography||"CA")?selectedGeo:"",
+          view: resolveDashboardView()&&resolveDashboardView()!=="treemap"?resolveDashboardView():"",
+        }),
+      });
+    }
     renderApp();
   }).catch(error=>{
     console.error(error);

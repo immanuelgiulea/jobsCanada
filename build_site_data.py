@@ -6,6 +6,7 @@ Reads:
 
 Writes:
 - site/data.json
+- site/search-index.json
 - site/family-data/*.json
 - site/job-family-*.html
 """
@@ -23,6 +24,7 @@ from outlook_data import label_from_score
 
 SITE_DIR = Path("site")
 OUTPUT_PATH = SITE_DIR / "data.json"
+SEARCH_INDEX_PATH = SITE_DIR / "search-index.json"
 FAMILY_DATA_DIR = SITE_DIR / "family-data"
 FAMILY_ROUTE_GLOB = "job-family-*.html"
 LEGACY_FAMILY_ROUTE_GLOB = "family-major-*.html"
@@ -102,16 +104,19 @@ def render_family_route_document(slug):
             '<meta charset="UTF-8">',
             '<meta name="viewport" content="width=device-width, initial-scale=1.0">',
             "<title>Major Group Job Family Page</title>",
+            '<link rel="stylesheet" href="./global-search.css">',
             '<link rel="stylesheet" href="./job-family-page.css">',
             "</head>",
             "<body>",
             '<div class="page-nav">',
             '  <a class="back-link" href="./">Back to dashboard</a>',
+            '  <div id="globalSearchMount" class="page-search"></div>',
             "</div>",
             '<div class="shell">',
             '  <div id="app" class="loading">Loading job family page...</div>',
             "</div>",
             f"<script>window.__FAMILY_SLUG__ = {slug_json};</script>",
+            '<script src="./global-search.js"></script>',
             '<script src="./job-family-page.js"></script>',
             "</body>",
             "</html>",
@@ -142,6 +147,106 @@ def write_family_assets(site_meta, family_pages):
             json.dump(family_payload, handle)
         with (SITE_DIR / route).open("w", encoding="utf-8", newline="\n") as handle:
             handle.write(render_family_route_document(slug))
+
+
+def dedupe_terms(values):
+    seen = set()
+    deduped = []
+    for value in values:
+        text = " ".join(str(value or "").split())
+        if not text:
+            continue
+        key = text.casefold()
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(text)
+    return deduped
+
+
+def compact_search_entry(kind, code, title, family_route, major_group_code, focus_code=None, unit_group_code=None, aliases=None):
+    entry = {
+        "k": kind,
+        "c": str(code),
+        "t": str(title),
+        "r": str(family_route),
+        "m": str(major_group_code),
+    }
+    if focus_code:
+        entry["f"] = str(focus_code)
+    if unit_group_code:
+        entry["u"] = str(unit_group_code)
+    deduped_aliases = dedupe_terms(aliases or [])
+    if deduped_aliases:
+        entry["a"] = deduped_aliases
+    return entry
+
+
+def build_search_index(site_meta, major_groups, occupations, oasis_artifact):
+    entries = []
+    occupation_by_code = {item["noc_code"]: item for item in occupations}
+
+    for major_group in major_groups:
+        entries.append(
+            compact_search_entry(
+                kind="major",
+                code=major_group["noc_code"],
+                title=major_group["title"],
+                family_route=major_group["family_route"],
+                major_group_code=major_group["major_group_code"],
+            )
+        )
+
+    for occupation in occupations:
+        entries.append(
+            compact_search_entry(
+                kind="unit",
+                code=occupation["noc_code"],
+                title=occupation["title"],
+                family_route=occupation["family_route"],
+                major_group_code=occupation["major_group_code"],
+                focus_code=occupation["noc_code"],
+                unit_group_code=occupation["noc_code"],
+            )
+        )
+
+    if oasis_artifact:
+        for profile in oasis_artifact.get("profiles", []):
+            if not isinstance(profile, dict):
+                continue
+            unit_group_code = str(profile.get("noc_code") or "")
+            occupation = occupation_by_code.get(unit_group_code)
+            if not occupation:
+                continue
+            alias_values = [
+                item.get("job_title_text")
+                for item in profile.get("example_titles", [])
+                if isinstance(item, dict)
+            ]
+            entries.append(
+                compact_search_entry(
+                    kind="profile",
+                    code=profile["oasis_profile_code"],
+                    title=profile["profile_title"],
+                    family_route=occupation["family_route"],
+                    major_group_code=occupation["major_group_code"],
+                    focus_code=profile["oasis_profile_code"],
+                    unit_group_code=unit_group_code,
+                    aliases=alias_values,
+                )
+            )
+
+    entries.sort(key=lambda item: (item["k"], item["c"]))
+    return {
+        "meta": {
+            "generated_at_utc": site_meta["generated_at_utc"],
+            "major_group_count": len(major_groups),
+            "unit_group_count": len(occupations),
+            "profile_count": sum(1 for item in entries if item["k"] == "profile"),
+            "entry_count": len(entries),
+        },
+        "entries": entries,
+    }
 
 
 def aggregate_major_group_stats(items, geo_code, total_geo_jobs):
@@ -402,6 +507,7 @@ def main():
             "title": "AI Exposure of the Canadian Job Market",
             "geography": "Canada",
             "default_geography": DEFAULT_GEO_CODE,
+            "search_index_route": SEARCH_INDEX_PATH.name,
             "geographies": GEO_METADATA,
             "occupation_count": len(occupations),
             "canonical_unit_group_count": len(occupations),
@@ -462,15 +568,19 @@ def main():
         )
 
     write_family_assets(payload["meta"], family_pages)
+    search_index = build_search_index(payload["meta"], major_groups, occupations, oasis_artifact)
 
     SITE_DIR.mkdir(exist_ok=True)
     with OUTPUT_PATH.open("w", encoding="utf-8") as handle:
         json.dump(payload, handle)
+    with SEARCH_INDEX_PATH.open("w", encoding="utf-8") as handle:
+        json.dump(search_index, handle)
 
     total_jobs = sum(item["jobs"] for item in occupations if item["jobs"])
     print(f"Wrote {len(occupations)} canonical occupation groups to {OUTPUT_PATH}")
     print(f"Wrote {len(major_groups)} primary major-group rollups to payload")
     print(f"Wrote {len(family_pages)} job-family payloads to {FAMILY_DATA_DIR}")
+    print(f"Wrote {search_index['meta']['entry_count']} search entries to {SEARCH_INDEX_PATH}")
     print(f"Total workers represented ({jobs_year}): {total_jobs:,}")
 
 
