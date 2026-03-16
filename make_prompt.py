@@ -1,5 +1,5 @@
 """
-Generate prompt.md with Canadian occupation data, outlooks, and official EPIAC exposure fields.
+Generate prompt.md with canonical Canadian NOC 2021 unit-group data.
 
 Usage:
     uv run python make_prompt.py
@@ -81,7 +81,7 @@ def main():
     lines = [
         "# AI Exposure of the Canadian Job Market",
         "",
-        f"This document contains Statistics Canada occupation-group data for Canada. Employment and wages use annual tables through {jobs_year}, outlook uses province-aggregated ESDC data for {outlook_start}-{outlook_end}, and AI exposure uses StatCan's official EPIAC framework mapped from the {exposure_year} Census-based study.",
+        f"This document contains canonical NOC 2021 unit-group data for Canada. Employment and wages use annual StatCan tables through {jobs_year}, but those tables are published at a coarser occupation grain than the official 516 unit groups, so the dataset allocates published annual totals onto the canonical unit groups using ESDC unit employment weights. Outlook uses unit-level ESDC data for {outlook_start}-{outlook_end}, and AI exposure maps StatCan's official EPIAC framework onto the canonical unit groups from published {exposure_year} Census-based occupation groups.",
         "",
         "Sources:",
         "- https://www150.statcan.gc.ca/t1/tbl1/en/tv.action?pid=1410041601",
@@ -93,7 +93,7 @@ def main():
         "",
         "## Aggregate statistics",
         "",
-        f"- Occupation groups: {len(records)}",
+        f"- Canonical unit groups: {len(records)}",
         f"- Total workers ({jobs_year}): {total_jobs:,} ({total_jobs / 1_000_000:.1f}M)",
         f"- Job-weighted EPIAC high-exposure share: {weighted_high_share:.1f}%",
         f"- Job-weighted AIOE: {weighted_aioe:.2f}",
@@ -112,9 +112,9 @@ def main():
         f"| HEHC | {fmt_jobs(round(hehc_workers))} | {hehc_workers / total_jobs * 100:.1f}% |",
         f"| Low exposure | {fmt_jobs(round(low_workers))} | {low_workers / total_jobs * 100:.1f}% |",
         "",
-        f"## Occupations with the highest EPIAC high-exposure share ({exposure_year} mapping)",
+        f"## Unit groups with the highest EPIAC high-exposure share ({exposure_year} mapped source groups)",
         "",
-        "| Occupation group | High-exposure share | Dominant EPIAC group | AIOE | Complementarity | Outlook | Workers |",
+        "| Unit group | High-exposure share | Dominant EPIAC group | AIOE | Complementarity | Outlook | Workers |",
         "|------------------|---------------------|----------------------|------|-----------------|---------|---------|",
     ]
 
@@ -130,7 +130,7 @@ def main():
             "",
             f"## Biggest growers since {trend_from_year}",
             "",
-            "| Occupation group | High-exposure share | Dominant EPIAC group | Employment change | Workers | Median hourly wage |",
+            "| Unit group | High-exposure share | Dominant EPIAC group | Employment change | Workers | Median hourly wage |",
             "|------------------|---------------------|----------------------|-------------------|---------|--------------------|",
         ]
     )
@@ -139,7 +139,7 @@ def main():
             f"| {record['title']} | {record['epiac_high_exposure_pct']:.1f}% | {record['epiac_group_label'] or '?'} | {record['trend_pct']:+.1f}% | {fmt_jobs(record['jobs'])} | {fmt_money(record['pay_hourly'])} |"
         )
 
-    lines.extend(["", f"## All {len(records)} occupation groups", ""])
+    lines.extend(["", f"## All {len(records)} canonical unit groups", ""])
     for record in records:
         source_note = record["epiac_source_note"].replace("|", "/")
         change = f"{record['trend_pct']:+.1f}%" if record["trend_pct"] is not None else "?"
@@ -166,7 +166,7 @@ def main():
     with open("prompt.md", "w", encoding="utf-8") as handle:
         handle.write("\n".join(lines) + "\n")
 
-    print(f"Wrote prompt.md with {len(records)} occupation groups")
+    print(f"Wrote prompt.md with {len(records)} canonical unit groups")
 
 
 if __name__ == "__main__":

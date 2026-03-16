@@ -67,7 +67,7 @@ canvas#canvas{display:block;position:fixed;top:0;left:var(--sidebar-w);cursor:de
   <div class="stat-section"><h3>Workers by high-exp. share</h3><div class="histogram" id="histogram"></div><div class="hist-labels"><span>0%</span><span>50%</span><span>100%</span></div></div>
   <div class="stat-section"><h3>EPIAC mix</h3><div class="tier-bar" id="tierBar"></div></div>
   <div class="stat-section"><h3>High-exp. share by hourly pay</h3><div class="hbar-chart" id="payChart"></div></div>
-  <div class="stat-section"><h3>High-exp. share by dashboard family</h3><div class="hbar-chart" id="familyChart"></div></div>
+  <div class="stat-section"><h3>High-exp. share by broad category</h3><div class="hbar-chart" id="familyChart"></div></div>
   <div class="stat-section"><h3>Estimated high-exp. workers</h3><div class="stat-big" id="statHighExposure">-</div><div class="stat-label" id="statHighExposureDesc">Workers mapped to high-exposure EPIAC occupations</div></div>
   <div class="stat-section"><h3 id="outlookMixTitle">2025-2027 outlook mix</h3><div class="stat-label" id="outlookMixNote"></div><div class="tier-bar" id="outlookMix"></div></div>
   <div class="stat-section" id="provinceDispersionSection" hidden><h3>Province outlook dispersion</h3><div class="stat-label" id="provinceDispersionNote"></div><div class="tier-bar" id="provinceDispersion"></div></div>
@@ -92,7 +92,7 @@ const VIEW_INFO={
 };
 const OUTLOOK_LABELS=["Very good","Good","Moderate","Limited","Very limited","Undetermined"];
 const OUTLOOK_LABEL_TO_SCORE={"Very good":2,"Good":1,"Moderate":0,"Limited":-1,"Very limited":-2};
-const categoryShort={"Management occupations":"Mgmt","Business, finance and administration occupations, except management":"Bus/Admin","Natural and applied sciences and related occupations, except management":"STEM","Health occupations, except management":"Health","Occupations in education, law and social, community and government services, except management":"Edu/Law","Occupations in art, culture, recreation and sport, except management":"Arts","Sales and service occupations, except management":"Sales","Trades, transport and equipment operators and related occupations, except management":"Trades","Natural resources, agriculture and related production occupations, except management":"Resources","Occupations in manufacturing and utilities, except management":"Mfg/Util"};
+const categoryShort={"Legislative and senior management occupations":"Mgmt","Business, finance and administration occupations":"Bus/Admin","Natural and applied sciences and related occupations":"STEM","Health occupations":"Health","Occupations in education, law and social, community and government services":"Edu/Law","Occupations in art, culture, recreation and sport":"Arts","Sales and service occupations":"Sales","Trades, transport and equipment operators and related occupations":"Trades","Natural resources, agriculture and related production occupations":"Resources","Occupations in manufacturing and utilities":"Mfg/Util"};
 const MOBILE_BREAKPOINT=980,MIN_CANVAS_HEIGHT=560,MARGIN=14,GAP=2,FULL_CATEGORY_HEADER=18,COMPACT_CATEGORY_HEADER=14;
 
 let meta={},geoLookup={},sourceData=[],allData=[],data=[],rects=[],trendRects=[],outlookRects=[],categoryRects=[],hovered=null,currentView="treemap",activeCategory="All",selectedGeo="CA",dpr=window.devicePixelRatio||1;
@@ -127,7 +127,7 @@ function formatMappingNoteHTML(note){
   const paragraphs=(normalized.match(/[^.!?]+(?:[.!?]+["')\]]*|$)/g)||[normalized]).map(sentence=>sentence.trim()).filter(Boolean);
   return`<div class="tt-rationale-label">Mapping note</div>${paragraphs.map(sentence=>`<p>${escapeHTML(sentence)}</p>`).join("")}`;
 }
-function dashboardFamilyLabel(category){return category==="All"?"All dashboard families":`${shortCategoryLabel(category)} dashboard family`}
+function categoryFilterLabel(category){return category==="All"?"All broad categories":`${shortCategoryLabel(category)} broad category`}
 function getCategoryHeaderStyle(groupRect){
   if(groupRect.rh>66&&groupRect.rw>110)return{height:FULL_CATEGORY_HEADER,fontSize:10,padding:6,showValue:groupRect.rw>150};
   if(groupRect.rh>30&&groupRect.rw>58)return{height:COMPACT_CATEGORY_HEADER,fontSize:9,padding:5,showValue:false};
@@ -177,7 +177,7 @@ function populateGeographySelect(){
 
 function populateCategoryChips(){
   const root=document.getElementById("categoryChips");
-  const options=[{category:"All",label:"All dashboard families",jobs:totalJobs(allData)},...getCategoryGroups(allData)];
+  const options=[{category:"All",label:"All broad categories",jobs:totalJobs(allData)},...getCategoryGroups(allData)];
   root.innerHTML=options.map(option=>`<button type="button" class="category-chip${option.category===activeCategory?" active":""}" data-category="${escapeHTML(option.category)}"><span>${escapeHTML(option.label)}</span><span class="chip-metric">${formatCompact(option.jobs)}</span></button>`).join("");
   root.querySelectorAll(".category-chip").forEach(button=>button.addEventListener("click",()=>setCategory(button.dataset.category||"All")));
 }
@@ -201,7 +201,7 @@ function updateGeographyCopy(){
   const hasGeoJobs=hasJobsData(allData);
   const hasGeoOutlook=allData.some(item=>item.outlook_label!=null||item.outlook_score!=null);
   let copy="";
-  if(isCanadaGeo(selectedGeo))copy="Canada stays the default view. Labour-market metrics use Canada-wide values. The first outlook panel shows the Canada aggregate, while the second replays the visible dashboard groups across provinces so province-only labels remain visible.";
+  if(isCanadaGeo(selectedGeo))copy="Canada stays the default view. Labour-market metrics use Canada-wide values. The first outlook panel shows the Canada aggregate, while the second replays the visible major groups across provinces so province-only labels remain visible.";
   else if(hasGeoJobs)copy=`${geo.label_en} switches jobs, trend, unemployment, wages, and outlook. EPIAC remains the same national mapping; only the employment weights change.`;
   else if(hasGeoOutlook)copy=`${geo.label_en} has ESDC outlook coverage, but the current StatCan occupation tables do not provide labour-market counts for this selector, so missing values stay unavailable.`;
   else copy=`Current source tables do not provide labour-market coverage for ${geo.label_en}. Missing values stay unavailable rather than using Canada as a fallback.`;
@@ -546,7 +546,7 @@ function showTooltip(item,clientX,clientY){
   const outlookStart=item.outlook_window_start??findMetricValue(allData,"outlook_window_start")??meta.outlook_window_start??2025;
   const outlookEnd=item.outlook_window_end??findMetricValue(allData,"outlook_window_end")??meta.outlook_window_end??2027;
   tt.querySelector(".tt-title").textContent=item.title;
-  tt.querySelector(".tt-subtitle").textContent=`${shortCategoryLabel(item.category)} dashboard family | NOC ${item.noc_code} | ${geoLabel}`;
+  tt.querySelector(".tt-subtitle").textContent=`${shortCategoryLabel(item.category)} broad category | Major group ${item.noc_code} | ${geoLabel}`;
   if(item.epiac_high_exposure_pct!=null){
     const width=Math.max(0,Math.min(100,item.epiac_high_exposure_pct));
     const color=exposureColorCSS((item.epiac_high_exposure_pct||0)/10,1);
@@ -557,7 +557,7 @@ function showTooltip(item,clientX,clientY){
   }
   tt.querySelector(".tt-stats").innerHTML=`<span class="label">Median hourly wage</span><span class="value">${formatMoney(item.pay_hourly)}</span><span class="label">Workers (${jobsYear||"-"})</span><span class="value">${formatCompact(item.jobs)}</span><span class="label">Paid employees</span><span class="value">${formatCompact(item.employees)}</span><span class="label">Employment share</span><span class="value">${formatPercent(item.employment_share_pct)}</span><span class="label">Employment change</span><span class="value">${formatSignedPercent(item.trend_pct)} (${trendLabel})</span><span class="label">Outlook (${outlookStart}-${outlookEnd})</span><span class="value">${item.outlook_label||"Undetermined"}</span><span class="label">Men / Women share</span><span class="value">${formatSharePair(item.men_share_pct,item.women_share_pct)}</span><span class="label">AIOE (${item.epiac_reference_year||meta.exposure_reference_year||"2021"})</span><span class="value">${item.epiac_aioe!=null?item.epiac_aioe.toFixed(2):"-"}</span><span class="label">Complementarity</span><span class="value">${item.epiac_complementarity!=null?item.epiac_complementarity.toFixed(2):"-"}</span><span class="label">HELC / HEHC / Low</span><span class="value">${item.epiac_helc_pct!=null?item.epiac_helc_pct.toFixed(0):"-"} / ${item.epiac_hehc_pct!=null?item.epiac_hehc_pct.toFixed(0):"-"} / ${item.epiac_low_pct!=null?item.epiac_low_pct.toFixed(0):"-"}%</span><span class="label">Unemployment</span><span class="value">${formatPercent(item.unemployment_rate)}</span>`;
   const rationaleEl=tt.querySelector(".tt-rationale");
-  const mappingNoteHtml=formatMappingNoteHTML(item.exposure_rationale);
+  const mappingNoteHtml=formatMappingNoteHTML([item.metric_rationale,item.exposure_rationale].filter(Boolean).join(" "));
   rationaleEl.innerHTML=mappingNoteHtml;
   rationaleEl.hidden=!mappingNoteHtml;
   tt.scrollTop=0;
@@ -633,8 +633,8 @@ function renderOutlookMix(items){
   const isCanadaView=isCanadaGeo(selectedGeo);
   document.getElementById("outlookMixTitle").textContent=isCanadaView?"Canada aggregate outlook mix":"2025-2027 outlook mix";
   document.getElementById("outlookMixNote").textContent=isCanadaView
-    ?"Each row uses the Canada-wide aggregate label for the visible dashboard groups. The province panel below re-aggregates those same groups across province labels."
-    :"Each row uses the selected geography's outlook label for the visible dashboard groups.";
+    ?"Each row uses the Canada-wide aggregate label for the visible major groups. The province panel below re-aggregates those same groups across province labels."
+    :"Each row uses the selected geography's outlook label for the visible major groups.";
   const target=document.getElementById("outlookMix");
   if(!hasJobsData(items)){target.innerHTML=renderNote("Unavailable for the current selection.");return}
   const visibleJobs=totalJobs(items);
@@ -681,7 +681,7 @@ function renderProvinceDispersion(items){
   const target=document.getElementById("provinceDispersion");
   if(!isCanadaGeo(selectedGeo)){section.hidden=true;return}
   section.hidden=false;
-  note.textContent="Re-aggregates the visible dashboard groups across provincial labels. Province count shows where a bucket appears; jobs and share use province-level employment rather than the Canada aggregate.";
+  note.textContent="Re-aggregates the visible major groups across provincial labels. Province count shows where a bucket appears; jobs and share use province-level employment rather than the Canada aggregate.";
   const dispersion=buildProvinceDispersion(items);
   if(!dispersion.totalOccurrences){target.innerHTML=renderNote("Unavailable for the current selection.");return}
   target.innerHTML=dispersion.rows.map(row=>{
@@ -722,7 +722,7 @@ function computeStats(){
     document.getElementById("statTotalJobsDesc").textContent=`No employment counts are available for ${shortCategoryLabel(activeCategory)} in ${geoLabel}.`;
     document.getElementById("statAvgExposure").textContent="-";
     document.getElementById("statHighExposure").textContent="-";
-    document.getElementById("statHighExposureDesc").textContent=`No visible employment weights are available for the selected dashboard family in ${geoLabel}.`;
+    document.getElementById("statHighExposureDesc").textContent=`No visible employment weights are available for the selected broad category in ${geoLabel}.`;
     renderHistogram(new Array(11).fill(0));
     renderTierBar([]);
     renderPayChart([]);
@@ -744,8 +744,8 @@ function computeStats(){
 
   document.getElementById("statTotalJobs").textContent=formatCompact(visibleJobs);
   document.getElementById("statTotalJobsDesc").textContent=activeCategory==="All"
-    ?(jobsYear?`All dashboard families in ${geoLabel}, ${jobsYear}`:`All dashboard families in ${geoLabel}`)
-    :`${shortCategoryLabel(activeCategory)} dashboard family, ${geoJobs>0?(visibleJobs/geoJobs*100).toFixed(1):"0.0"}% of ${geoLabel}`;
+    ?(jobsYear?`All broad categories in ${geoLabel}, ${jobsYear}`:`All broad categories in ${geoLabel}`)
+    :`${shortCategoryLabel(activeCategory)} broad category, ${geoJobs>0?(visibleJobs/geoJobs*100).toFixed(1):"0.0"}% of ${geoLabel}`;
   document.getElementById("statAvgExposure").innerHTML=`<span style="color:${exposureColorCSS(weightedHighShare/10,1)}">${weightedHighShare.toFixed(0)}%</span>`;
   renderHistogram(histogram);
   renderTierBar(data);
@@ -778,16 +778,17 @@ function updateSubtitle(){
   const outlookStart=findMetricValue(allData,"outlook_window_start")??meta.outlook_window_start??"2025";
   const outlookEnd=findMetricValue(allData,"outlook_window_end")??meta.outlook_window_end??"2027";
   const exposureYear=meta.exposure_reference_year||findMetricValue(sourceData,"epiac_reference_year")||"2021";
-  const visibleCount=data.length,totalCount=meta.occupation_count||allData.length||visibleCount,filterLabel=dashboardFamilyLabel(activeCategory),viewInfo=VIEW_INFO[currentView];
+  const visibleCount=data.length,totalCount=meta.primary_rollup_count||allData.length||visibleCount,filterLabel=categoryFilterLabel(activeCategory),viewInfo=VIEW_INFO[currentView];
   const geo=getGeoMeta(selectedGeo);
   const hasGeoJobs=hasJobsData(allData);
-  const familyModelNote=meta.dashboard_hierarchy&&meta.dashboard_hierarchy.family_model_note?meta.dashboard_hierarchy.family_model_note:"";
+  const rollupModelNote=meta.primary_rollup_note||"";
+  const metricModelNote=meta.metric_model_note||"";
   const geoLine=hasGeoJobs
     ?`${geo.label_en}${jobsYear?`, ${jobsYear}`:""} annual data from <a href="https://www150.statcan.gc.ca/t1/tbl1/en/tv.action?pid=1410041601" target="_blank" rel="noopener">StatCan</a>`
     :geo.type==="territory"
     ?`${geo.label_en} is included in the selector, but the current StatCan occupation tables exclude the territories`
     :`${geo.label_en} has no current StatCan occupation labour-market data`;
-  subtitle.innerHTML=`${visibleCount} of ${totalCount} dashboard occupation groups shown | ${meta.dashboard_family_count||10} dashboard families | area = employment | ${viewInfo.colorLine}<br>Filter: ${escapeHTML(filterLabel)} | ${geoLine}<br>${familyModelNote?`${escapeHTML(familyModelNote)} | `:""}Exposure uses mapped StatCan EPIAC estimates from ${exposureYear} Census occupations | outlook uses ESDC ${outlookStart}-${outlookEnd} | <a href="https://karpathy.ai/jobs/" target="_blank" rel="noopener">upstream inspiration</a>`;
+  subtitle.innerHTML=`${visibleCount} of ${totalCount} official major groups shown | ${meta.major_group_count||allData.length} official major groups | area = employment | ${viewInfo.colorLine}<br>Filter: ${escapeHTML(filterLabel)} | ${geoLine}<br>${rollupModelNote?`${escapeHTML(rollupModelNote)} | `:""}${metricModelNote?`${escapeHTML(metricModelNote)} | `:""}Exposure uses mapped StatCan EPIAC estimates from ${exposureYear} Census occupations | outlook uses ESDC ${outlookStart}-${outlookEnd} | <a href="https://karpathy.ai/jobs/" target="_blank" rel="noopener">upstream inspiration</a>`;
 }
 
 function updateEmptyState(){
@@ -798,8 +799,8 @@ function updateEmptyState(){
     emptyState.textContent="";
     return;
   }
-  if(geo.type==="territory")emptyState.textContent=`StatCan's occupation labour-force tables exclude the territories, so ${geo.label_en} has no employment counts for this dashboard. Outlook metadata remains available where ESDC publishes it, but missing labour-market values stay unavailable.`;
-  else if(activeCategory!=="All")emptyState.textContent=`No employment counts are available for the ${shortCategoryLabel(activeCategory)} dashboard family in ${geo.label_en}.`;
+  if(geo.type==="territory")emptyState.textContent=`StatCan's occupation labour-force tables exclude the territories, so ${geo.label_en} has no employment counts for the major-group dashboard. Outlook metadata remains available where ESDC publishes it, but missing labour-market values stay unavailable.`;
+  else if(activeCategory!=="All")emptyState.textContent=`No employment counts are available for the ${shortCategoryLabel(activeCategory)} broad category in ${geo.label_en}.`;
   else emptyState.textContent=`No employment counts are available for ${geo.label_en}.`;
   emptyState.classList.add("visible");
 }
@@ -841,7 +842,7 @@ fetch("data.json").then(response=>{
   return response.json();
 }).then(payload=>{
   meta=payload.meta||{};
-  sourceData=payload.occupations||[];
+  sourceData=payload.major_groups||payload.occupations||[];
   geoLookup=Object.fromEntries(getGeoList().map(geo=>[geo.code,geo]));
   currentView=getInitialView();
   selectedGeo=getInitialGeo();

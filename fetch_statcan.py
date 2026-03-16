@@ -1,25 +1,21 @@
 """
-Download and transform StatCan occupation tables into project inputs.
+Download and transform StatCan occupation tables into canonical NOC 2021 inputs.
 
-This replaces the BLS handbook scrape with annual Canadian labour-market data
-from Statistics Canada:
+Generated outputs:
 
-- 14-10-0416-01 Labour force characteristics by occupation, annual
-- 14-10-0417-01 Employee wages by occupation, annual
+- `occupations.csv` / `occupations.json`: canonical NOC 2021 unit groups (516)
 
-Outputs:
-- occupations.json
-- occupations.csv
-- pages/<slug>.md
-
-Usage:
-    uv run python fetch_statcan.py
+The official NOC 2021 hierarchy is the canonical spine. StatCan annual labour-
+force and wage tables are published at a coarser occupation grain, so canonical
+unit-group counts are estimated by allocating each published source group across
+its unit groups using ESDC outlook employment weights.
 """
 
 from __future__ import annotations
 
 import csv
 import json
+import math
 import re
 import zipfile
 from dataclasses import dataclass
@@ -28,7 +24,8 @@ from urllib.request import urlopen
 
 from epiac_data import load_group_epiac
 from geography import DEFAULT_GEO_CODE, GEO_CODES, STATCAN_GEO_TO_CODE
-from outlook_data import load_group_outlooks
+from noc_hierarchy import load_official_noc_structure
+from outlook_data import expand_group_prefixes, load_group_outlooks, load_unit_outlooks
 
 
 EMPLOYMENT_TABLE_ID = "14100416"
@@ -44,6 +41,8 @@ STATCAN_PAGE_URLS = {
 
 DATA_DIR = Path("tmp/statcan")
 PAGES_DIR = Path("pages")
+CANONICAL_INDEX_PATH = Path("occupations.json")
+CANONICAL_CSV_PATH = Path("occupations.csv")
 
 EMPLOYMENT_DIMENSION_ID = "3"
 WAGE_DIMENSION_ID = "4"
@@ -177,11 +176,11 @@ def to_people(thousands: float | None) -> int | None:
     return int(round(thousands * 1000))
 
 
-def slugify_code(code: str) -> str:
+def slugify_code(code: str, prefix: str = "noc") -> str:
     cleaned = code.strip("[]").replace(", ", "-").replace(",", "-").replace(" ", "")
     cleaned = re.sub(r"[^0-9a-zA-Z-]+", "-", cleaned)
     cleaned = re.sub(r"-{2,}", "-", cleaned).strip("-").lower()
-    return f"noc-{cleaned}"
+    return f"{prefix}-{cleaned}"
 
 
 def fmt_number(value: int | None) -> str:
@@ -200,14 +199,6 @@ def fmt_currency(value: float | None) -> str:
     if value is None:
         return "-"
     return f"${value:.2f}"
-
-
-def recent_years(end_year: int, available_years: set[int], count: int = 7) -> list[int]:
-    years = []
-    for year in range(end_year - count + 1, end_year + 1):
-        if year in available_years:
-            years.append(year)
-    return years
 
 
 def empty_geo_metrics() -> dict[str, dict[str, dict[int, float]]]:
@@ -242,7 +233,7 @@ def build_geo_snapshot(
     baseline_year: int,
     total_latest_jobs: int,
     outlook: dict[str, object],
-) -> tuple[dict[str, object], dict[str, object]]:
+) -> dict[str, object]:
     latest_jobs = geo_metrics["employment"].get(jobs_year) if jobs_year is not None else None
     baseline_jobs = geo_metrics["employment"].get(baseline_year)
     latest_men = geo_metrics["men_employment"].get(jobs_year) if jobs_year is not None else None
@@ -271,11 +262,12 @@ def build_geo_snapshot(
     average_hourly = geo_metrics["average_hourly_wage"].get(wages_year) if wages_year is not None else None
     average_weekly = geo_metrics["average_weekly_wage"].get(wages_year) if wages_year is not None else None
 
-    snapshot = {
+    return {
         "jobs": to_people(latest_jobs),
         "jobs_year": jobs_year,
         "trend_pct": round_value(change_pct, 1),
         "trend_from_year": baseline_year if jobs_year is not None else None,
+        "employment_change_abs": change_abs,
         "unemployment_rate": round_value(
             geo_metrics["unemployment_rate"].get(jobs_year) if jobs_year is not None else None,
             1,
@@ -286,18 +278,105 @@ def build_geo_snapshot(
         "employees": to_people(geo_metrics["num_employees"].get(wages_year)) if wages_year is not None else None,
         "pay_hourly": round_value(pay_hourly, 2),
         "pay_weekly": round_value(pay_weekly, 2),
+        "average_hourly_wage": round_value(average_hourly, 2),
+        "average_weekly_wage": round_value(average_weekly, 2),
         "outlook_label": outlook.get("outlook_label") or None,
         "outlook_score": round_value(outlook.get("outlook_score"), 2),  # type: ignore[arg-type]
         "outlook_window_start": outlook.get("outlook_window_start") or None,
         "outlook_window_end": outlook.get("outlook_window_end") or None,
         "outlook_release_date": outlook.get("outlook_release_date") or None,
+        "outlook_weight_basis": outlook.get("outlook_weight_basis") or None,
     }
-    extras = {
-        "employment_change_abs": change_abs,
-        "average_hourly_wage": round_value(average_hourly, 2),
-        "average_weekly_wage": round_value(average_weekly, 2),
-    }
-    return snapshot, extras
+
+
+def csv_int(value: int | None) -> int | str:
+    return value if value is not None else ""
+
+
+def csv_float(value: float | None, digits: int) -> str:
+    if value is None:
+        return ""
+    return f"{value:.{digits}f}"
+
+
+def apportion_integer(total: int | None, weights: list[float]) -> list[int | None]:
+    if total is None:
+        return [None] * len(weights)
+    if not weights:
+        return []
+
+    sign = -1 if total < 0 else 1
+    absolute_total = abs(total)
+    normalized = [max(0.0, float(weight)) for weight in weights]
+    if sum(normalized) <= 0:
+        normalized = [1.0] * len(weights)
+
+    total_weight = sum(normalized)
+    exact = [(absolute_total * weight) / total_weight for weight in normalized]
+    floors = [math.floor(value) for value in exact]
+    remainder = absolute_total - sum(floors)
+    order = sorted(
+        range(len(exact)),
+        key=lambda idx: (exact[idx] - floors[idx], normalized[idx], -idx),
+        reverse=True,
+    )
+    for idx in order[:remainder]:
+        floors[idx] += 1
+    return [sign * value for value in floors]
+
+
+def unit_allocation_weights(
+    unit_codes: list[str],
+    geo_code: str,
+    unit_outlooks_by_geo: dict[str, dict[str, dict[str, object]]],
+) -> list[float]:
+    weights: list[float] = []
+    for unit_code in unit_codes:
+        weight = unit_outlooks_by_geo.get(geo_code, {}).get(unit_code, {}).get("employment_weight")
+        if weight in (None, 0):
+            weight = unit_outlooks_by_geo.get(DEFAULT_GEO_CODE, {}).get(unit_code, {}).get("employment_weight")
+        weights.append(float(weight) if weight not in (None, "") else 0.0)
+    return weights
+
+
+def build_metric_note() -> str:
+    return (
+        "StatCan annual labour-force and wage tables do not publish this official NOC 2021 unit group "
+        "directly. Labour-market counts are estimated by allocating the published StatCan annual occupation "
+        "tables across official unit groups using ESDC outlook employment weights. Rates and wage fields "
+        "inherit published source-group values until a direct canonical StatCan release is added."
+    )
+
+
+def build_source_group_unit_map(
+    source_group_codes: list[str],
+    official_unit_codes: list[str],
+) -> tuple[dict[str, str], dict[str, list[str]]]:
+    unit_to_source_group: dict[str, str] = {}
+    source_units_by_group: dict[str, list[str]] = {}
+
+    for source_group_code in source_group_codes:
+        prefixes = expand_group_prefixes(source_group_code)
+        matched_unit_codes = sorted(
+            code for code in official_unit_codes if any(code.startswith(prefix) for prefix in prefixes)
+        )
+        if not matched_unit_codes:
+            raise ValueError(f"Published source group {source_group_code!r} did not match any official unit groups")
+
+        source_units_by_group[source_group_code] = matched_unit_codes
+        for unit_code in matched_unit_codes:
+            if unit_code in unit_to_source_group:
+                raise ValueError(f"Unit group {unit_code} is covered more than once in the source allocation map")
+            unit_to_source_group[unit_code] = source_group_code
+
+    uncovered_unit_codes = sorted(code for code in official_unit_codes if code not in unit_to_source_group)
+    if uncovered_unit_codes:
+        raise ValueError(
+            "Published source-group allocation does not cover all canonical unit groups: "
+            + ", ".join(uncovered_unit_codes[:10])
+        )
+
+    return unit_to_source_group, source_units_by_group
 
 
 def main() -> None:
@@ -323,22 +402,21 @@ def main() -> None:
     if not common_labels:
         raise ValueError("No overlapping occupation groups found between StatCan tables")
 
-    occupations = {}
+    source_groups: dict[str, dict[str, object]] = {}
     for label in common_labels:
         member = employment_leaves[label]
-        occupations[label] = {
+        source_group_code = member.code.strip("[]")
+        source_groups[source_group_code] = {
             "title": member.name,
-            "noc_code": member.code.strip("[]"),
-            "slug": slugify_code(member.code),
+            "noc_code": source_group_code,
             "category": top_level_category(member.member_id, employment_members, employment_root_id),
-            "url": STATCAN_PAGE_URLS["employment"],
             "employment_url": STATCAN_PAGE_URLS["employment"],
             "wages_url": STATCAN_PAGE_URLS["wages"],
-            "stats_by_geo": empty_geo_metrics(),
+            "raw_geo_metrics": empty_geo_metrics(),
         }
 
-    outlook_by_geo, outlook_meta = load_group_outlooks([record["noc_code"] for record in occupations.values()])
-    epiac_by_group, _ = load_group_epiac([record["noc_code"] for record in occupations.values()])
+    source_outlooks_by_geo, _ = load_group_outlooks(list(source_groups))
+    epiac_by_group, _ = load_group_epiac(list(source_groups))
 
     employment_years_by_geo = {geo_code: set() for geo_code in GEO_CODES}
     wage_years_by_geo = {geo_code: set() for geo_code in GEO_CODES}
@@ -350,8 +428,9 @@ def main() -> None:
             if not geo_code:
                 continue
             label = row["National Occupational Classification (NOC)"]
-            if label not in occupations:
+            if label not in employment_leaves:
                 continue
+            source_group_code = employment_leaves[label].code.strip("[]")
             measure = row["Labour force characteristics"]
             if measure not in EMPLOYMENT_MEASURES:
                 continue
@@ -361,7 +440,7 @@ def main() -> None:
                 continue
 
             employment_years_by_geo[geo_code].add(year)
-            geo_metrics = occupations[label]["stats_by_geo"][geo_code]
+            geo_metrics = source_groups[source_group_code]["raw_geo_metrics"][geo_code]
             gender = row["Gender"]
             if measure == "Employment":
                 if gender == "Total - Gender":
@@ -389,8 +468,9 @@ def main() -> None:
             if row["Age group"] != "15 years and over":
                 continue
             label = row["National Occupational Classification (NOC)"]
-            if label not in occupations:
+            if label not in wage_leaves:
                 continue
+            source_group_code = wage_leaves[label].code.strip("[]")
             measure = row["Wages"]
             if measure not in WAGE_MEASURES:
                 continue
@@ -406,7 +486,7 @@ def main() -> None:
                 "Median hourly wage rate": "median_hourly_wage",
                 "Median weekly wage rate": "median_weekly_wage",
             }[measure]
-            occupations[label]["stats_by_geo"][geo_code][key][year] = value
+            source_groups[source_group_code]["raw_geo_metrics"][geo_code][key][year] = value
 
     all_job_years = sorted({year for years in employment_years_by_geo.values() for year in years})
     all_wage_years = sorted({year for years in wage_years_by_geo.values() for year in years})
@@ -424,8 +504,8 @@ def main() -> None:
     }
     total_latest_jobs_by_geo = {
         geo_code: sum(
-            to_people(record["stats_by_geo"][geo_code]["employment"].get(jobs_year_by_geo[geo_code])) or 0
-            for record in occupations.values()
+            to_people(record["raw_geo_metrics"][geo_code]["employment"].get(jobs_year_by_geo[geo_code])) or 0
+            for record in source_groups.values()
         )
         if jobs_year_by_geo[geo_code] is not None
         else 0
@@ -435,13 +515,46 @@ def main() -> None:
     canada_jobs_year = jobs_year_by_geo[DEFAULT_GEO_CODE]
     canada_wages_year = wages_year_by_geo[DEFAULT_GEO_CODE]
     if canada_jobs_year is None or canada_wages_year is None:
-        raise ValueError("Canada-wide data is required for compatibility outputs")
+        raise ValueError("Canada-wide data is required for canonical outputs")
 
-    fieldnames = [
+    for source_group_code, record in source_groups.items():
+        stats_by_geo_output: dict[str, dict[str, object]] = {}
+        for geo_code in GEO_CODES:
+            stats_by_geo_output[geo_code] = build_geo_snapshot(
+                record["raw_geo_metrics"][geo_code],
+                jobs_year_by_geo[geo_code],
+                wages_year_by_geo[geo_code],
+                baseline_year,
+                total_latest_jobs_by_geo[geo_code],
+                source_outlooks_by_geo.get(geo_code, {}).get(source_group_code, {}),
+            )
+        record["stats_by_geo"] = stats_by_geo_output
+        record["epiac"] = epiac_by_group.get(source_group_code, {})
+
+    official_noc = load_official_noc_structure()
+    unit_outlooks_by_geo, unit_outlook_meta = load_unit_outlooks()
+    official_unit_codes = [str(unit["code"]) for unit in official_noc["unit_groups"]]
+    unit_to_source_group, source_units_by_group = build_source_group_unit_map(
+        sorted(source_groups),
+        official_unit_codes,
+    )
+
+    canonical_fieldnames = [
         "title",
         "category",
         "slug",
         "noc_code",
+        "broad_category_code",
+        "broad_category_title",
+        "major_group_code",
+        "major_group_title",
+        "sub_major_group_code",
+        "sub_major_group_title",
+        "minor_group_code",
+        "minor_group_title",
+        "definition",
+        "metric_source_kind",
+        "metric_source_note",
         "data_year",
         "trend_from_year",
         "num_jobs",
@@ -483,85 +596,166 @@ def main() -> None:
         "stats_by_geo_json",
     ]
 
-    rows = []
-    occupations_index = []
-    page_records = []
+    metric_note = build_metric_note()
+    canonical_records: dict[str, dict[str, object]] = {}
+    for unit in official_noc["unit_groups"]:
+        unit_code = str(unit["code"])
+        source_group_code = unit_to_source_group[unit_code]
+        source_record = source_groups[source_group_code]
+        source_epiac = source_record["epiac"]
+        canonical_records[unit_code] = {
+            "title": unit["title"],
+            "category": unit["broad_category_title"],
+            "slug": slugify_code(unit_code),
+            "noc_code": unit_code,
+            "broad_category_code": unit["broad_category_code"],
+            "broad_category_title": unit["broad_category_title"],
+            "major_group_code": unit["major_group_code"],
+            "major_group_title": unit["major_group_title"],
+            "sub_major_group_code": unit["sub_major_group_code"],
+            "sub_major_group_title": unit["sub_major_group_title"],
+            "minor_group_code": unit["minor_group_code"],
+            "minor_group_title": unit["minor_group_title"],
+            "definition": unit["definition"] or "",
+            "metric_source_kind": "published_annual_group_allocation",
+            "metric_source_note": metric_note,
+            "epiac_reference_year": source_epiac.get("epiac_reference_year"),
+            "epiac_display_score": source_epiac.get("epiac_display_score"),
+            "epiac_high_exposure_pct": source_epiac.get("epiac_high_exposure_pct"),
+            "epiac_helc_pct": source_epiac.get("epiac_helc_pct"),
+            "epiac_hehc_pct": source_epiac.get("epiac_hehc_pct"),
+            "epiac_low_pct": source_epiac.get("epiac_low_pct"),
+            "epiac_aioe": source_epiac.get("epiac_aioe"),
+            "epiac_complementarity": source_epiac.get("epiac_complementarity"),
+            "epiac_caioe": source_epiac.get("epiac_caioe"),
+            "epiac_group_code": source_epiac.get("epiac_group_code"),
+            "epiac_group_label": source_epiac.get("epiac_group_label"),
+            "epiac_source_title": source_epiac.get("epiac_source_title"),
+            "epiac_source_url": source_epiac.get("epiac_source_url"),
+            "epiac_source_note": str(source_epiac.get("epiac_source_note", "")),
+            "epiac_source_groups": source_epiac.get("epiac_source_groups", []),
+            "url": str(official_noc["source_page_url"]),
+            "employment_url": source_record["employment_url"],
+            "wages_url": source_record["wages_url"],
+            "stats_by_geo": {},
+        }
 
-    for label, record in occupations.items():
-        stats_by_geo_output: dict[str, dict[str, object]] = {}
-        extras_by_geo: dict[str, dict[str, object]] = {}
-        for geo_code in GEO_CODES:
-            geo_stats, geo_extras = build_geo_snapshot(
-                record["stats_by_geo"][geo_code],
-                jobs_year_by_geo[geo_code],
-                wages_year_by_geo[geo_code],
-                baseline_year,
-                total_latest_jobs_by_geo[geo_code],
-                outlook_by_geo.get(geo_code, {}).get(record["noc_code"], {}),
-            )
-            stats_by_geo_output[geo_code] = geo_stats
-            extras_by_geo[geo_code] = geo_extras
+    for geo_code in GEO_CODES:
+        for source_group_code, unit_codes in source_units_by_group.items():
+            source_stats = source_groups[source_group_code]["stats_by_geo"][geo_code]
+            weights = unit_allocation_weights(unit_codes, geo_code, unit_outlooks_by_geo)
+            job_allocations = apportion_integer(source_stats["jobs"], weights)
+            employee_allocations = apportion_integer(source_stats["employees"], weights)
+            change_allocations = apportion_integer(source_stats["employment_change_abs"], weights)
+            for idx, unit_code in enumerate(unit_codes):
+                unit_outlook = unit_outlooks_by_geo.get(geo_code, {}).get(unit_code, {})
+                canonical_records[unit_code]["stats_by_geo"][geo_code] = {
+                    "jobs": job_allocations[idx],
+                    "jobs_year": source_stats["jobs_year"],
+                    "trend_pct": source_stats["trend_pct"],
+                    "trend_from_year": source_stats["trend_from_year"],
+                    "employment_change_abs": change_allocations[idx],
+                    "unemployment_rate": source_stats["unemployment_rate"],
+                    "employment_share_pct": None,
+                    "men_share_pct": source_stats["men_share_pct"],
+                    "women_share_pct": source_stats["women_share_pct"],
+                    "employees": employee_allocations[idx],
+                    "pay_hourly": source_stats["pay_hourly"],
+                    "pay_weekly": source_stats["pay_weekly"],
+                    "average_hourly_wage": source_stats["average_hourly_wage"],
+                    "average_weekly_wage": source_stats["average_weekly_wage"],
+                    "outlook_label": unit_outlook.get("outlook_label") or None,
+                    "outlook_score": round_value(unit_outlook.get("outlook_score"), 2),  # type: ignore[arg-type]
+                    "outlook_window_start": unit_outlook_meta["window_start"],
+                    "outlook_window_end": unit_outlook_meta["window_end"],
+                    "outlook_release_date": unit_outlook.get("release_date") or unit_outlook_meta["release_date"],
+                    "outlook_weight_basis": "unit_group_outlook",
+                }
 
-        canada_stats = stats_by_geo_output[DEFAULT_GEO_CODE]
-        canada_extras = extras_by_geo[DEFAULT_GEO_CODE]
-        epiac = epiac_by_group.get(record["noc_code"], {})
+        geo_total_jobs = sum(
+            stats.get("jobs") or 0
+            for record in canonical_records.values()
+            for stats in [record["stats_by_geo"][geo_code]]
+        )
+        for record in canonical_records.values():
+            stats = record["stats_by_geo"][geo_code]
+            if stats["jobs"] is not None and geo_total_jobs:
+                stats["employment_share_pct"] = round((stats["jobs"] / geo_total_jobs) * 100, 1)
 
+    canonical_rows: list[dict[str, object]] = []
+    occupations_index: list[dict[str, object]] = []
+    for unit_code, record in canonical_records.items():
+        canada_stats = record["stats_by_geo"][DEFAULT_GEO_CODE]
         row = {
             "title": record["title"],
             "category": record["category"],
             "slug": record["slug"],
-            "noc_code": record["noc_code"],
-            "data_year": canada_stats["jobs_year"] or "",
-            "trend_from_year": canada_stats["trend_from_year"] or "",
-            "num_jobs": canada_stats["jobs"] or "",
-            "unemployment_rate": f"{canada_stats['unemployment_rate']:.1f}" if canada_stats["unemployment_rate"] is not None else "",
-            "employment_share_pct": f"{canada_stats['employment_share_pct']:.1f}" if canada_stats["employment_share_pct"] is not None else "",
-            "employment_change_pct": f"{canada_stats['trend_pct']:.1f}" if canada_stats["trend_pct"] is not None else "",
-            "employment_change_abs": canada_extras["employment_change_abs"] if canada_extras["employment_change_abs"] is not None else "",
-            "men_share_pct": f"{canada_stats['men_share_pct']:.1f}" if canada_stats["men_share_pct"] is not None else "",
-            "women_share_pct": f"{canada_stats['women_share_pct']:.1f}" if canada_stats["women_share_pct"] is not None else "",
-            "num_employees": canada_stats["employees"] or "",
-            "average_hourly_wage": f"{canada_extras['average_hourly_wage']:.2f}" if canada_extras["average_hourly_wage"] is not None else "",
-            "average_weekly_wage": f"{canada_extras['average_weekly_wage']:.2f}" if canada_extras["average_weekly_wage"] is not None else "",
-            "median_hourly_wage": f"{canada_stats['pay_hourly']:.2f}" if canada_stats["pay_hourly"] is not None else "",
-            "median_weekly_wage": f"{canada_stats['pay_weekly']:.2f}" if canada_stats["pay_weekly"] is not None else "",
+            "noc_code": unit_code,
+            "broad_category_code": record["broad_category_code"],
+            "broad_category_title": record["broad_category_title"],
+            "major_group_code": record["major_group_code"],
+            "major_group_title": record["major_group_title"],
+            "sub_major_group_code": record["sub_major_group_code"],
+            "sub_major_group_title": record["sub_major_group_title"],
+            "minor_group_code": record["minor_group_code"],
+            "minor_group_title": record["minor_group_title"],
+            "definition": record["definition"],
+            "metric_source_kind": record["metric_source_kind"],
+            "metric_source_note": record["metric_source_note"],
+            "data_year": csv_int(canada_stats["jobs_year"]),
+            "trend_from_year": csv_int(canada_stats["trend_from_year"]),
+            "num_jobs": csv_int(canada_stats["jobs"]),
+            "unemployment_rate": csv_float(canada_stats["unemployment_rate"], 1),
+            "employment_share_pct": csv_float(canada_stats["employment_share_pct"], 1),
+            "employment_change_pct": csv_float(canada_stats["trend_pct"], 1),
+            "employment_change_abs": csv_int(canada_stats["employment_change_abs"]),
+            "men_share_pct": csv_float(canada_stats["men_share_pct"], 1),
+            "women_share_pct": csv_float(canada_stats["women_share_pct"], 1),
+            "num_employees": csv_int(canada_stats["employees"]),
+            "average_hourly_wage": csv_float(canada_stats["average_hourly_wage"], 2),
+            "average_weekly_wage": csv_float(canada_stats["average_weekly_wage"], 2),
+            "median_hourly_wage": csv_float(canada_stats["pay_hourly"], 2),
+            "median_weekly_wage": csv_float(canada_stats["pay_weekly"], 2),
             "outlook_label": canada_stats["outlook_label"] or "",
-            "outlook_score": f"{canada_stats['outlook_score']:.2f}" if canada_stats["outlook_score"] is not None else "",
-            "outlook_window_start": canada_stats["outlook_window_start"] or "",
-            "outlook_window_end": canada_stats["outlook_window_end"] or "",
+            "outlook_score": csv_float(canada_stats["outlook_score"], 2),
+            "outlook_window_start": csv_int(canada_stats["outlook_window_start"]),
+            "outlook_window_end": csv_int(canada_stats["outlook_window_end"]),
             "outlook_release_date": canada_stats["outlook_release_date"] or "",
-            "outlook_source_url": outlook_by_geo.get(DEFAULT_GEO_CODE, {}).get(record["noc_code"], {}).get("outlook_source_url", ""),
-            "epiac_reference_year": epiac.get("epiac_reference_year", ""),
-            "epiac_display_score": epiac.get("epiac_display_score", ""),
-            "epiac_high_exposure_pct": f"{epiac['epiac_high_exposure_pct']:.1f}" if epiac.get("epiac_high_exposure_pct") is not None else "",
-            "epiac_helc_pct": f"{epiac['epiac_helc_pct']:.1f}" if epiac.get("epiac_helc_pct") is not None else "",
-            "epiac_hehc_pct": f"{epiac['epiac_hehc_pct']:.1f}" if epiac.get("epiac_hehc_pct") is not None else "",
-            "epiac_low_pct": f"{epiac['epiac_low_pct']:.1f}" if epiac.get("epiac_low_pct") is not None else "",
-            "epiac_aioe": f"{epiac['epiac_aioe']:.4f}" if epiac.get("epiac_aioe") is not None else "",
-            "epiac_complementarity": f"{epiac['epiac_complementarity']:.4f}" if epiac.get("epiac_complementarity") is not None else "",
-            "epiac_caioe": f"{epiac['epiac_caioe']:.4f}" if epiac.get("epiac_caioe") is not None else "",
-            "epiac_group_code": epiac.get("epiac_group_code", ""),
-            "epiac_group_label": epiac.get("epiac_group_label", ""),
-            "epiac_source_title": epiac.get("epiac_source_title", ""),
-            "epiac_source_url": epiac.get("epiac_source_url", ""),
-            "epiac_source_note": epiac.get("epiac_source_note", ""),
-            "epiac_source_groups": "; ".join(epiac.get("epiac_source_groups", [])),
+            "outlook_source_url": str(unit_outlook_meta["page_url"]),
+            "epiac_reference_year": record["epiac_reference_year"] or "",
+            "epiac_display_score": record["epiac_display_score"] or "",
+            "epiac_high_exposure_pct": csv_float(record["epiac_high_exposure_pct"], 1),
+            "epiac_helc_pct": csv_float(record["epiac_helc_pct"], 1),
+            "epiac_hehc_pct": csv_float(record["epiac_hehc_pct"], 1),
+            "epiac_low_pct": csv_float(record["epiac_low_pct"], 1),
+            "epiac_aioe": csv_float(record["epiac_aioe"], 4),
+            "epiac_complementarity": csv_float(record["epiac_complementarity"], 4),
+            "epiac_caioe": csv_float(record["epiac_caioe"], 4),
+            "epiac_group_code": record["epiac_group_code"] or "",
+            "epiac_group_label": record["epiac_group_label"] or "",
+            "epiac_source_title": record["epiac_source_title"] or "",
+            "epiac_source_url": record["epiac_source_url"] or "",
+            "epiac_source_note": record["epiac_source_note"] or "",
+            "epiac_source_groups": "; ".join(record["epiac_source_groups"]),
             "url": record["url"],
             "employment_url": record["employment_url"],
             "wages_url": record["wages_url"],
             "stats_by_geo_json": json.dumps(
-                stats_by_geo_output,
+                record["stats_by_geo"],
                 ensure_ascii=True,
                 separators=(",", ":"),
             ),
         }
-        rows.append(row)
+        canonical_rows.append(row)
         occupations_index.append(
             {
                 "title": record["title"],
                 "category": record["category"],
                 "slug": record["slug"],
-                "noc_code": record["noc_code"],
+                "noc_code": unit_code,
+                "broad_category_code": record["broad_category_code"],
+                "major_group_code": record["major_group_code"],
+                "major_group_title": record["major_group_title"],
                 "outlook_label": row["outlook_label"],
                 "outlook_score": row["outlook_score"],
                 "epiac_display_score": row["epiac_display_score"],
@@ -570,97 +764,75 @@ def main() -> None:
                 "url": record["url"],
             }
         )
-        page_records.append((record, row))
 
-    rows.sort(key=lambda row: (row["category"], -(row["num_jobs"] or 0), row["title"]))
-    occupations_index.sort(key=lambda row: (row["category"], row["title"]))
+    canonical_rows.sort(key=lambda row: str(row["noc_code"]))
+    occupations_index.sort(key=lambda row: str(row["noc_code"]))
 
-    with Path("occupations.csv").open("w", newline="", encoding="utf-8") as handle:
-        writer = csv.DictWriter(handle, fieldnames=fieldnames)
+    with CANONICAL_CSV_PATH.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=canonical_fieldnames)
         writer.writeheader()
-        writer.writerows(rows)
+        writer.writerows(canonical_rows)
 
-    with Path("occupations.json").open("w", encoding="utf-8") as handle:
+    with CANONICAL_INDEX_PATH.open("w", encoding="utf-8") as handle:
         json.dump(occupations_index, handle, indent=2)
 
     PAGES_DIR.mkdir(parents=True, exist_ok=True)
-    for record, row in page_records:
-        canada_metrics = record["stats_by_geo"][DEFAULT_GEO_CODE]
-        years = recent_years(
-            canada_jobs_year,
-            set(canada_metrics["employment"].keys()) | set(canada_metrics["median_hourly_wage"].keys()),
-        )
+    for record in canonical_records.values():
+        canada_stats = record["stats_by_geo"][DEFAULT_GEO_CODE]
         lines = [
             f"# {record['title']}",
             "",
-            f"- NOC 2021 group: {record['noc_code']}",
-            f"- Broad category: {record['category']}",
-            f"- Employment in Canada ({canada_jobs_year}): {fmt_number(int(row['num_jobs']) if row['num_jobs'] else None)}",
-            f"- Unemployment rate ({canada_jobs_year}): {fmt_percent(parse_float(row['unemployment_rate']))}",
-            f"- Share of total Canadian employment ({canada_jobs_year}): {fmt_percent(parse_float(row['employment_share_pct']))}",
-            f"- Employment change ({baseline_year} to {canada_jobs_year}): {fmt_percent(parse_float(row['employment_change_pct']))} ({fmt_number(int(row['employment_change_abs']) if row['employment_change_abs'] else None)})",
-            f"- Men+ share of employment ({canada_jobs_year}): {fmt_percent(parse_float(row['men_share_pct']))}",
-            f"- Women+ share of employment ({canada_jobs_year}): {fmt_percent(parse_float(row['women_share_pct']))}",
-            f"- Median hourly wage ({canada_wages_year}): {fmt_currency(parse_float(row['median_hourly_wage']))}",
-            f"- StatCan EPIAC high-exposure share ({row['epiac_reference_year']}): {fmt_percent(parse_float(row['epiac_high_exposure_pct']))}",
-            f"- Dominant EPIAC group: {row['epiac_group_label'] or '-'}",
-            f"- Average AIOE / complementarity ({row['epiac_reference_year']}): {(parse_float(row['epiac_aioe']) or 0):.2f} / {(parse_float(row['epiac_complementarity']) or 0):.2f}",
-            f"- Employment outlook ({row['outlook_window_start']} to {row['outlook_window_end']}): {row['outlook_label'] or '-'}",
-            f"- Median weekly wage ({canada_wages_year}): {fmt_currency(parse_float(row['median_weekly_wage']))}",
-            f"- Average hourly wage ({canada_wages_year}): {fmt_currency(parse_float(row['average_hourly_wage']))}",
-            f"- Average weekly wage ({canada_wages_year}): {fmt_currency(parse_float(row['average_weekly_wage']))}",
+            f"- NOC 2021 unit group: {record['noc_code']}",
+            f"- Broad category: {record['broad_category_code']} {record['broad_category_title']}",
+            f"- Major group: {record['major_group_code']} {record['major_group_title']}",
+            f"- Sub-major group: {record['sub_major_group_code']} {record['sub_major_group_title']}",
+            f"- Minor group: {record['minor_group_code']} {record['minor_group_title']}",
+            f"- Employment in Canada ({canada_jobs_year} estimate): {fmt_number(canada_stats['jobs'])}",
+            f"- Unemployment rate ({canada_jobs_year} published-source rate): {fmt_percent(canada_stats['unemployment_rate'])}",
+            f"- Share of total Canadian employment ({canada_jobs_year} estimate): {fmt_percent(canada_stats['employment_share_pct'])}",
+            f"- Employment change ({baseline_year} to {canada_jobs_year} published-source rate): {fmt_percent(canada_stats['trend_pct'])} ({fmt_number(canada_stats['employment_change_abs'])})",
+            f"- Men+ share of employment ({canada_jobs_year} published-source rate): {fmt_percent(canada_stats['men_share_pct'])}",
+            f"- Women+ share of employment ({canada_jobs_year} published-source rate): {fmt_percent(canada_stats['women_share_pct'])}",
+            f"- Median hourly wage ({canada_wages_year} published-source rate): {fmt_currency(canada_stats['pay_hourly'])}",
+            f"- StatCan EPIAC high-exposure share ({record['epiac_reference_year']} mapped): {fmt_percent(record['epiac_high_exposure_pct'])}",
+            f"- Dominant EPIAC group: {record['epiac_group_label'] or '-'}",
+            f"- Average AIOE / complementarity ({record['epiac_reference_year']} mapped): {(record['epiac_aioe'] or 0):.2f} / {(record['epiac_complementarity'] or 0):.2f}",
+            f"- Employment outlook ({unit_outlook_meta['window_start']} to {unit_outlook_meta['window_end']}): {canada_stats['outlook_label'] or '-'}",
+            f"- Median weekly wage ({canada_wages_year} published-source rate): {fmt_currency(canada_stats['pay_weekly'])}",
+            f"- Average hourly wage ({canada_wages_year} published-source rate): {fmt_currency(canada_stats['average_hourly_wage'])}",
+            f"- Average weekly wage ({canada_wages_year} published-source rate): {fmt_currency(canada_stats['average_weekly_wage'])}",
             "",
-            "## Recent annual series",
+            "## Official definition",
             "",
-            "| Year | Employment | Unemployment rate | Median hourly wage |",
-            "|------|------------|-------------------|--------------------|",
+            record["definition"] or "Definition unavailable.",
+            "",
+            "## Methodology notes",
+            "",
+            record["metric_source_note"],
+            "",
+            record["epiac_source_note"],
+            "",
+            "## Source tables",
+            "",
+            f"- Official NOC 2021 classification structure: {official_noc['source_url']}",
+            f"- Labour force characteristics by occupation, annual: {record['employment_url']}",
+            f"- Employee wages by occupation, annual: {record['wages_url']}",
+            f"- {record['epiac_source_title']}: {record['epiac_source_url']}",
+            f"- {unit_outlook_meta['title']}: {unit_outlook_meta['page_url']}",
+            "",
+            "## Geography coverage note",
+            "",
+            "The StatCan occupation tables in this project cover Canada and the provinces only. Yukon, the Northwest Territories, and Nunavut remain in the generated geography metadata, but labour-market metrics for those selectors are left unavailable rather than backfilled.",
         ]
-        for year in years:
-            lines.append(
-                "| "
-                + " | ".join(
-                    [
-                        str(year),
-                        fmt_number(to_people(canada_metrics["employment"].get(year))),
-                        fmt_percent(canada_metrics["unemployment_rate"].get(year)),
-                        fmt_currency(canada_metrics["median_hourly_wage"].get(year)),
-                    ]
-                )
-                + " |"
-            )
-        lines.extend(
-            [
-                "",
-                "## Source tables",
-                "",
-                f"- Labour force characteristics by occupation, annual: {record['employment_url']}",
-                f"- Employee wages by occupation, annual: {record['wages_url']}",
-                f"- {row['epiac_source_title']}: {row['epiac_source_url']}",
-                f"- {outlook_meta['title']}: {outlook_meta['page_url']}",
-                "",
-                "## Geography coverage note",
-                "",
-                "The StatCan occupation tables in this project cover Canada and the provinces only. Yukon, the Northwest Territories, and Nunavut remain in the generated geography metadata, but labour-market metrics for those selectors are left unavailable rather than backfilled.",
-            ]
-        )
-        if row["epiac_source_note"]:
-            lines.extend(
-                [
-                    "",
-                    "## EPIAC mapping note",
-                    "",
-                    row["epiac_source_note"],
-                ]
-            )
         (PAGES_DIR / f"{record['slug']}.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
-    print(f"Wrote {len(rows)} occupation groups to occupations.csv")
-    print(f"Wrote {len(occupations_index)} occupation entries to occupations.json")
-    print(f"Wrote {len(page_records)} markdown summaries to {PAGES_DIR}/")
+    print(f"Wrote {len(canonical_rows)} canonical unit groups to {CANONICAL_CSV_PATH}")
+    print(f"Wrote {len(occupations_index)} canonical occupation entries to {CANONICAL_INDEX_PATH}")
+    print(f"Wrote {len(canonical_rows)} markdown summaries to {PAGES_DIR}/")
     print("Geography coverage:")
     print("  - Labour-market data: Canada and 10 provinces")
     print("  - Outlook-only metadata: Yukon, Northwest Territories, Nunavut")
-    total_jobs = sum(int(row["num_jobs"]) for row in rows if row["num_jobs"])
+    total_jobs = sum(int(row["num_jobs"]) for row in canonical_rows if row["num_jobs"])
     print(f"Latest employment represented ({canada_jobs_year}): {total_jobs:,}")
 
 

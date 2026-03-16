@@ -75,44 +75,86 @@ function groupColor(code){if(code==="HELC")return"#d85a1f";if(code==="HEHC")retu
 function params(){return new URLSearchParams(window.location.search)}
 function renderNotFound(){document.title="Occupation not found";document.getElementById("app").outerHTML='<div class="empty">No occupation matched that link. Return to the <a href="./">dashboard</a> and try again.</div>'}
 function sourceLink(url,label){if(!url)return"";return `<a class="source-link" href="${url}" target="_blank" rel="noopener">${escapeHTML(label)}</a>`}
-fetch("data.json").then(response=>{if(!response.ok)throw new Error(`HTTP ${response.status}`);return response.json()}).then(payload=>{
-  const slug=params().get("slug");
-  const meta=payload.meta||{};
-  const occupation=(payload.occupations||[]).find(item=>item.slug===slug);
-  if(!occupation){renderNotFound();return}
-  document.title=`${occupation.title} | AI Exposure of the Canadian Job Market`;
-  const exposureYear=occupation.epiac_reference_year||meta.exposure_reference_year||2021;
-  const jobsYear=occupation.jobs_year||meta.jobs_year||"";
-  const trendWindow=occupation.trend_from_year!=null&&jobsYear?`${occupation.trend_from_year}-${jobsYear}`:"recent";
-  const outlookWindow=occupation.outlook_window_start&&occupation.outlook_window_end?`${occupation.outlook_window_start}-${occupation.outlook_window_end}`:`${meta.outlook_window_start||2025}-${meta.outlook_window_end||2027}`;
-  const sourceGroups=(occupation.epiac_source_groups||[]).map(group=>`<span class="source-tag">${escapeHTML(group)}</span>`).join("");
-  const groupLabel=occupation.epiac_group_label||"EPIAC group unavailable";
-  const outlookLabel=occupation.outlook_label||"Undetermined";
-  const rationale=occupation.exposure_rationale||"No mapping note available.";
-  const officialBroadCategories=(occupation.official_broad_category_codes||[]).map((code,index)=>`${code} ${occupation.official_broad_category_labels&&occupation.official_broad_category_labels[index]?occupation.official_broad_category_labels[index]:""}`.trim()).join("; ");
-  const hierarchyCoverage=`${occupation.official_major_group_count||0} major | ${occupation.official_sub_major_group_count||0} sub-major | ${occupation.official_minor_group_count||0} minor | ${occupation.official_unit_group_count||0} unit`;
+function findBySlugOrCode(items,slug,code){
+  if(slug){
+    const bySlug=items.find(item=>item.slug===slug);
+    if(bySlug)return bySlug;
+  }
+  if(code){
+    const byCode=items.find(item=>String(item.noc_code)===code);
+    if(byCode)return byCode;
+  }
+  return null;
+}
+function renderNotes(notes){
+  const parts=notes.filter(Boolean);
+  if(!parts.length)return'<div class="note">No methodology note available.</div>';
+  return parts.map(note=>`<div class="note">${escapeHTML(note)}</div>`).join("");
+}
+function renderPage(item,layer,meta){
+  const exposureYear=item.epiac_reference_year||meta.exposure_reference_year||2021;
+  const jobsYear=item.jobs_year||meta.jobs_year||"";
+  const trendWindow=item.trend_from_year!=null&&jobsYear?`${item.trend_from_year}-${jobsYear}`:"recent";
+  const outlookWindow=item.outlook_window_start&&item.outlook_window_end?`${item.outlook_window_start}-${item.outlook_window_end}`:`${meta.outlook_window_start||2025}-${meta.outlook_window_end||2027}`;
+  const sourceGroups=(item.epiac_source_groups||[]).map(group=>`<span class="source-tag">${escapeHTML(group)}</span>`).join("");
+  const groupLabel=item.epiac_group_label||"EPIAC group unavailable";
+  const outlookLabel=item.outlook_label||"Undetermined";
+  const metricNote=item.metric_rationale||item.metric_source_note||"";
+  const exposureNote=item.exposure_rationale||"";
+  let eyebrow=`NOC ${escapeHTML(item.noc_code)} / Canada / ${jobsYear}`;
+  let summary="";
+  let profileRows="";
+  let noteBlock=renderNotes([metricNote,exposureNote]);
+  const primarySourceLabel="Official NOC classification source";
+  if(layer==="major_group"){
+    eyebrow=`NOC major ${escapeHTML(item.noc_code)} / Canada / ${jobsYear}`;
+    summary=`${escapeHTML(item.category)}. This official major group rolls up ${formatCompact(item.official_unit_group_count)} canonical NOC 2021 unit groups. Labour metrics aggregate the canonical unit estimates, while outlook aggregates unit-level ESDC outlooks for ${outlookWindow}.`;
+    profileRows=`
+      <dt>Broad category</dt><dd>${escapeHTML(item.category)}</dd>
+      <dt>Major group</dt><dd>${escapeHTML(`${item.noc_code} ${item.title}`)}</dd>
+      <dt>Canonical unit groups</dt><dd>${formatCompact(item.official_unit_group_count)}</dd>
+      <dt>Employed (${jobsYear} est.)</dt><dd>${formatCompact(item.jobs)}</dd>
+      <dt>Paid employees (${jobsYear} est.)</dt><dd>${formatCompact(item.employees)}</dd>
+      <dt>Employment share (${jobsYear})</dt><dd>${formatPercent(item.employment_share_pct)}</dd>
+      <dt>Men / women share</dt><dd>${formatPercent(item.men_share_pct)} / ${formatPercent(item.women_share_pct)}</dd>
+      <dt>Median hourly / weekly wage</dt><dd>${formatMoney(item.pay_hourly)} / ${formatMoney(item.pay_weekly)}</dd>`;
+  }else if(layer==="unit_group"){
+    summary=`${escapeHTML(item.category)}. This official NOC 2021 unit group sits inside major group ${escapeHTML(item.major_group_code||"-")} ${escapeHTML(item.major_group_title||"")}. Labour-market counts and wages are estimated from the published StatCan annual occupation tables allocated onto the canonical unit groups, while outlook is the unit-level ESDC outlook for ${outlookWindow}.`;
+    profileRows=`
+      <dt>Broad category</dt><dd>${escapeHTML(`${item.broad_category_code||"-"} ${item.broad_category_title||""}`.trim())}</dd>
+      <dt>Major group</dt><dd>${escapeHTML(`${item.major_group_code||"-"} ${item.major_group_title||""}`.trim())}</dd>
+      <dt>Sub-major group</dt><dd>${escapeHTML(`${item.sub_major_group_code||"-"} ${item.sub_major_group_title||""}`.trim())}</dd>
+      <dt>Minor group</dt><dd>${escapeHTML(`${item.minor_group_code||"-"} ${item.minor_group_title||""}`.trim())}</dd>
+      <dt>Employed (${jobsYear} est.)</dt><dd>${formatCompact(item.jobs)}</dd>
+      <dt>Paid employees (${jobsYear} est.)</dt><dd>${formatCompact(item.employees)}</dd>
+      <dt>Employment share (${jobsYear})</dt><dd>${formatPercent(item.employment_share_pct)}</dd>
+      <dt>Men / women share</dt><dd>${formatPercent(item.men_share_pct)} / ${formatPercent(item.women_share_pct)}</dd>
+      <dt>Median hourly / weekly wage</dt><dd>${formatMoney(item.pay_hourly)} / ${formatMoney(item.pay_weekly)}</dd>`;
+    if(item.definition)noteBlock=`<div class="note"><div class="sub-label">Official definition</div>${escapeHTML(item.definition)}</div>${noteBlock}`;
+  }
+  document.title=`${item.title} | AI Exposure of the Canadian Job Market`;
   document.getElementById("app").outerHTML=`
     <div class="layout">
       <div class="top-grid">
         <section class="hero">
-          <div class="eyebrow">NOC ${escapeHTML(occupation.noc_code)} / Canada / ${jobsYear}</div>
-          <h1>${escapeHTML(occupation.title)}</h1>
-          <div class="summary">${escapeHTML(occupation.category)} (${escapeHTML(occupation.dashboard_family_code||"")}). This dashboard group is ${escapeHTML((occupation.dashboard_mapping_kind_label||"a custom concordance").toLowerCase())} spanning ${formatCompact(occupation.official_unit_group_count)} official NOC 2021 unit groups. This detail page combines annual ${jobsYear} StatCan labour-market data, the mapped official StatCan EPIAC exposure fields, and the aggregated ESDC outlook for ${outlookWindow}.</div>
+          <div class="eyebrow">${eyebrow}</div>
+          <h1>${escapeHTML(item.title)}</h1>
+          <div class="summary">${summary}</div>
           <div class="meta-row">
-            <span class="pill">${formatCompact(occupation.jobs)} employed (${jobsYear} annual avg.)</span>
-            <span class="pill">${formatMoney(occupation.pay_hourly)} median hourly wage</span>
-            <span class="pill" style="color:${groupColor(occupation.epiac_group_code)};border-color:rgba(255,255,255,.12)">${escapeHTML(groupLabel)}</span>
+            <span class="pill">${formatCompact(item.jobs)} employed (${jobsYear} est.)</span>
+            <span class="pill">${formatMoney(item.pay_hourly)} median hourly wage</span>
+            <span class="pill" style="color:${groupColor(item.epiac_group_code)};border-color:rgba(255,255,255,.12)">${escapeHTML(groupLabel)}</span>
           </div>
-          <div class="note" style="font-size:13px">This page uses annual StatCan occupation data for ${jobsYear}. The monthly StatCan cube 14-10-0310-01 is seasonally adjusted and publishes broader occupation groups, so its current figures are not directly comparable to this page.</div>
+          <div class="note" style="font-size:13px">This page uses the canonical NOC 2021 spine. Labour-market counts and wages are estimated from published StatCan annual occupation tables allocated onto official unit groups, outlook comes from the unit-level ESDC release, and EPIAC fields are mapped from published StatCan occupation groups.</div>
         </section>
         <section class="panel epiac-panel">
           <h2>EPIAC Mix</h2>
           <div class="stack">
-            <div class="mix-row"><div class="mix-label">HELC</div><div class="mix-bar"><div class="mix-fill" style="width:${occupation.epiac_helc_pct||0}%;background:${groupColor("HELC")}"></div></div><div>${formatPercent(occupation.epiac_helc_pct)}</div></div>
-            <div class="mix-row"><div class="mix-label">HEHC</div><div class="mix-bar"><div class="mix-fill" style="width:${occupation.epiac_hehc_pct||0}%;background:${groupColor("HEHC")}"></div></div><div>${formatPercent(occupation.epiac_hehc_pct)}</div></div>
-            <div class="mix-row"><div class="mix-label">Low exposure</div><div class="mix-bar"><div class="mix-fill" style="width:${occupation.epiac_low_pct||0}%;background:${groupColor("LOW")}"></div></div><div>${formatPercent(occupation.epiac_low_pct)}</div></div>
+            <div class="mix-row"><div class="mix-label">HELC</div><div class="mix-bar"><div class="mix-fill" style="width:${item.epiac_helc_pct||0}%;background:${groupColor("HELC")}"></div></div><div>${formatPercent(item.epiac_helc_pct)}</div></div>
+            <div class="mix-row"><div class="mix-label">HEHC</div><div class="mix-bar"><div class="mix-fill" style="width:${item.epiac_hehc_pct||0}%;background:${groupColor("HEHC")}"></div></div><div>${formatPercent(item.epiac_hehc_pct)}</div></div>
+            <div class="mix-row"><div class="mix-label">Low exposure</div><div class="mix-bar"><div class="mix-fill" style="width:${item.epiac_low_pct||0}%;background:${groupColor("LOW")}"></div></div><div>${formatPercent(item.epiac_low_pct)}</div></div>
           </div>
-          <div class="note" style="margin-top:14px">Reference year for the mapped EPIAC fields: ${exposureYear}. Dashboard ranking is based on high-exposure share, but the raw AIOE and complementarity values are preserved on this page.</div>
+          <div class="note" style="margin-top:14px">Reference year for the current EPIAC fields: ${exposureYear}. The dashboard ranks by high-exposure share, but the raw AIOE and complementarity values are preserved on this page.</div>
           <div class="note" style="margin-top:12px"><div class="sub-label">Mapped Published EPIAC Groups</div><div class="source-tags">${sourceGroups||'<span class="source-tag">No source groups listed</span>'}</div></div>
         </section>
       </div>
@@ -121,32 +163,32 @@ fetch("data.json").then(response=>{if(!response.ok)throw new Error(`HTTP ${respo
         <div class="metrics-grid">
           <div class="metric emphasis">
             <div class="metric-label">High-Exposure Share</div>
-            <div class="metric-value metric-large">${formatPercent(occupation.epiac_high_exposure_pct)}</div>
+            <div class="metric-value metric-large">${formatPercent(item.epiac_high_exposure_pct)}</div>
             <div class="metric-sub">Share of workers mapped to high-exposure EPIAC occupations.</div>
           </div>
           <div class="metric">
             <div class="metric-label">Dominant EPIAC Group</div>
-            <div class="metric-value metric-text" style="color:${groupColor(occupation.epiac_group_code)}">${escapeHTML(groupLabel)}</div>
-            <div class="metric-sub">Official StatCan grouping for the mapped exposure mix.</div>
+            <div class="metric-value metric-text" style="color:${groupColor(item.epiac_group_code)}">${escapeHTML(groupLabel)}</div>
+            <div class="metric-sub">Dominant grouping in the current exposure mix.</div>
           </div>
           <div class="metric">
             <div class="metric-label">AIOE</div>
-            <div class="metric-value">${formatDecimal(occupation.epiac_aioe)}</div>
+            <div class="metric-value">${formatDecimal(item.epiac_aioe)}</div>
             <div class="metric-sub">Raw AI occupational exposure index.</div>
           </div>
           <div class="metric">
             <div class="metric-label">Complementarity</div>
-            <div class="metric-value">${formatDecimal(occupation.epiac_complementarity)}</div>
+            <div class="metric-value">${formatDecimal(item.epiac_complementarity)}</div>
             <div class="metric-sub">Higher values imply more AI-worker complementarity.</div>
           </div>
           <div class="metric">
             <div class="metric-label">CAIOE</div>
-            <div class="metric-value">${formatDecimal(occupation.epiac_caioe)}</div>
+            <div class="metric-value">${formatDecimal(item.epiac_caioe)}</div>
             <div class="metric-sub">Complementarity-adjusted AI occupational exposure.</div>
           </div>
           <div class="metric">
             <div class="metric-label">Employment Change</div>
-            <div class="metric-value">${formatSignedPercent(occupation.trend_pct)}</div>
+            <div class="metric-value">${formatSignedPercent(item.trend_pct)}</div>
             <div class="metric-sub">Trend window: ${trendWindow}.</div>
           </div>
           <div class="metric">
@@ -156,40 +198,41 @@ fetch("data.json").then(response=>{if(!response.ok)throw new Error(`HTTP ${respo
           </div>
           <div class="metric">
             <div class="metric-label">Unemployment</div>
-            <div class="metric-value">${formatPercent(occupation.unemployment_rate)}</div>
-            <div class="metric-sub">StatCan annual rate for ${jobsYear}.</div>
+            <div class="metric-value">${formatPercent(item.unemployment_rate)}</div>
+            <div class="metric-sub">${jobsYear?`Current value for ${jobsYear}.`:"Current value."}</div>
           </div>
         </div>
       </section>
       <div class="bottom-grid">
         <section class="panel">
           <h2>Occupation Profile</h2>
-          <dl class="table">
-            <dt>Dashboard family</dt><dd>${escapeHTML(occupation.category)}</dd>
-            <dt>Variant section</dt><dd>${escapeHTML(occupation.dashboard_family_code||"-")}</dd>
-            <dt>NOC mapping</dt><dd>${escapeHTML(occupation.dashboard_mapping_kind_label||"-")}</dd>
-            <dt>Official broad categories</dt><dd>${escapeHTML(officialBroadCategories||"-")}</dd>
-            <dt>Official coverage</dt><dd>${escapeHTML(hierarchyCoverage)}</dd>
-            <dt>Employed (${jobsYear} annual avg.)</dt><dd>${formatCompact(occupation.jobs)}</dd>
-            <dt>Paid employees (${jobsYear} annual avg.)</dt><dd>${formatCompact(occupation.employees)}</dd>
-            <dt>Employment share (${jobsYear})</dt><dd>${formatPercent(occupation.employment_share_pct)}</dd>
-            <dt>Men / women share</dt><dd>${formatPercent(occupation.men_share_pct)} / ${formatPercent(occupation.women_share_pct)}</dd>
-            <dt>Median hourly / weekly wage</dt><dd>${formatMoney(occupation.pay_hourly)} / ${formatMoney(occupation.pay_weekly)}</dd>
-          </dl>
+          <dl class="table">${profileRows}</dl>
         </section>
         <section class="panel panel-muted references">
           <h2>References</h2>
-          <div class="note">${escapeHTML(rationale)}</div>
+          ${noteBlock}
           <div class="link-row">
-            ${sourceLink(occupation.employment_url,"StatCan annual employment table")}
+            ${sourceLink(item.url,primarySourceLabel)}
+            ${sourceLink(item.employment_url,"StatCan annual employment table")}
             ${sourceLink("https://www150.statcan.gc.ca/t1/tbl1/en/tv.action?pid=1410031001","StatCan monthly employment cube")}
-            ${sourceLink(occupation.wages_url,"StatCan annual wages table")}
-            ${sourceLink(occupation.epiac_source_url,"StatCan EPIAC study")}
-            ${sourceLink(occupation.outlook_url,"ESDC outlook dataset")}
+            ${sourceLink(item.wages_url,"StatCan annual wages table")}
+            ${sourceLink(item.epiac_source_url,"StatCan EPIAC study")}
+            ${sourceLink(item.outlook_url,"ESDC outlook dataset")}
           </div>
         </section>
       </div>
     </div>`;
+}
+fetch("data.json").then(response=>{if(!response.ok)throw new Error(`HTTP ${response.status}`);return response.json()}).then(payload=>{
+  const query=params();
+  const slug=query.get("slug");
+  const code=query.get("code");
+  const meta=payload.meta||{};
+  const majorGroup=findBySlugOrCode(payload.major_groups||[],slug,code);
+  const unitGroup=findBySlugOrCode(payload.occupations||[],slug,code);
+  if(majorGroup){renderPage(majorGroup,"major_group",meta);return}
+  if(unitGroup){renderPage(unitGroup,"unit_group",meta);return}
+  renderNotFound();
 }).catch(error=>{console.error(error);document.getElementById("app").outerHTML='<div class="empty">Failed to load occupation details.</div>'});
 </script>
 </body>

@@ -233,10 +233,7 @@ def build_unit_outlooks(workbook_path: Path) -> dict[str, dict[str, dict[str, ob
     return unit_outlooks
 
 
-def load_group_outlooks(group_codes: list[str]) -> tuple[dict[str, dict[str, dict[str, object]]], dict[str, object]]:
-    workbook_path = ensure_outlook_workbook()
-    unit_outlooks_by_geo = build_unit_outlooks(workbook_path)
-
+def build_outlook_metadata(unit_outlooks_by_geo: dict[str, dict[str, dict[str, object]]]) -> dict[str, object]:
     release_dates = sorted(
         {
             entry["release_date"]
@@ -245,8 +242,9 @@ def load_group_outlooks(group_codes: list[str]) -> tuple[dict[str, dict[str, dic
             if entry["release_date"]
         }
     )
-    metadata = {
+    return {
         "title": OUTLOOK_TITLE,
+        "source_name": OUTLOOK_SOURCE_NAME,
         "page_url": OUTLOOK_PAGE_URL,
         "download_url": OUTLOOK_DOWNLOAD_URL,
         "window_start": OUTLOOK_WINDOW_START,
@@ -256,12 +254,54 @@ def load_group_outlooks(group_codes: list[str]) -> tuple[dict[str, dict[str, dic
         "geography_count": len(unit_outlooks_by_geo),
     }
 
+
+def load_unit_outlooks() -> tuple[dict[str, dict[str, dict[str, object]]], dict[str, object]]:
+    workbook_path = ensure_outlook_workbook()
+    unit_outlooks_by_geo = build_unit_outlooks(workbook_path)
+    canada_outlooks: dict[str, dict[str, object]] = {}
+    unit_codes = sorted(
+        {
+            code
+            for geo_entries in unit_outlooks_by_geo.values()
+            for code in geo_entries
+        }
+    )
+    for code in unit_codes:
+        matches = [
+            entry
+            for geo_code, geo_entries in unit_outlooks_by_geo.items()
+            if geo_code != DEFAULT_GEO_CODE
+            for unit_code, entry in geo_entries.items()
+            if unit_code == code
+        ]
+        if not matches:
+            continue
+        summary = summarize_outlook_entries(matches)
+        canada_outlooks[code] = {
+            "title": matches[0]["title"],
+            "outlook_label": summary["label"],
+            "outlook_score": round(summary["avg_score"], 2) if summary["avg_score"] is not None else None,
+            "employment_weight": summary["total_weight"] if summary["is_weighted"] else None,
+            "row_count": summary["entry_count"],
+            "valid_row_count": summary["valid_count"],
+            "release_date": summary["release_date"],
+        }
+
+    unit_outlooks_with_canada = {DEFAULT_GEO_CODE: canada_outlooks, **unit_outlooks_by_geo}
+    return unit_outlooks_with_canada, build_outlook_metadata(unit_outlooks_with_canada)
+
+
+def load_group_outlooks(group_codes: list[str]) -> tuple[dict[str, dict[str, dict[str, object]]], dict[str, object]]:
+    unit_outlooks_by_geo, metadata = load_unit_outlooks()
+
     group_outlooks: dict[str, dict[str, dict[str, object]]] = {DEFAULT_GEO_CODE: {}}
     for group_code in group_codes:
         prefixes = expand_group_prefixes(group_code)
         canada_matches: list[dict[str, object]] = []
 
         for geo_code, geo_entries in unit_outlooks_by_geo.items():
+            if geo_code == DEFAULT_GEO_CODE:
+                continue
             matches = [
                 entry
                 for code, entry in geo_entries.items()
